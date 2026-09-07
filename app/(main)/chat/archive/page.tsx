@@ -13,8 +13,8 @@ import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
 import type { Chat } from '@/lib/types/database.types'
 
 interface ChatRow extends Chat {
-  participant1: { id: string; username: string; avatar_url: string | null }
-  participant2: { id: string; username: string; avatar_url: string | null }
+  participant1: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null }
+  participant2: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null }
 }
 
 export default function ArchivePage() {
@@ -35,7 +35,7 @@ export default function ArchivePage() {
     if (!user) return
     const { data } = await supabase
       .from('chats')
-      .select('*, participant1:profiles!chats_participant1_id_fkey(id,username,avatar_url), participant2:profiles!chats_participant2_id_fkey(id,username,avatar_url)')
+      .select('*, participant1:profiles!chats_participant1_id_fkey(id,username,avatar_url,is_verified,verification_type), participant2:profiles!chats_participant2_id_fkey(id,username,avatar_url,is_verified,verification_type)')
       .or(`participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
       .order('last_message_time', { ascending: false })
 
