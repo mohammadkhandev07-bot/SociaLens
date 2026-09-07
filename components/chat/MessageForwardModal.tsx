@@ -24,7 +24,7 @@ interface Person {
 }
 
 // Same followers+following multi-select picker used for sharing an
-// Aperonix reply, reused here to forward an existing chat message.
+// Aperonix reply, Reused here to forward an existing chat message.
 export function MessageForwardModal({ message, onClose }: MessageForwardModalProps) {
   const { user } = useUser()
   const [people, setPeople] = useState<Person[]>([])
