@@ -106,7 +106,7 @@ export function NotificationPanel() {
   const getNotifLink = (n: Notification) => {
     switch (n.type) {
       // Feed/story links stay generic - there's no deep-link-to-a-specific-
-      // post or story route yet, so these just open the feed, same as before.
+      // Post or story route yet, so these just open the feed, same as before.
       case 'like': case 'comment': case 'new_post': case 'repost':
       case 'comment_like': case 'comment_react': case 'comment_reply':
       case 'story_like': case 'story_react': case 'story_comment':
