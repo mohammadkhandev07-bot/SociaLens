@@ -235,7 +235,7 @@ export type TextScene = {
   musicTitle?: string
   musicArtist?: string
   musicArtworkUrl?: string
-  musicStart?: number        // seconds into the preview clip to start from
+  musicStart?: number        // Seconds into the preview clip to start from
   musicDuration?: number     // how many seconds of it to play
 }
 
