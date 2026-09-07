@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
+import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 
 interface AperonixShareModalProps {
   replyText: string
@@ -17,6 +18,8 @@ interface Person {
   username: string
   avatar_url: string | null
   full_name: string | null
+  is_verified?: boolean
+  verification_type?: 'blue' | 'yellow' | null
 }
 
 // Same followers+following picker as the post ShareModal, Reused here so an.
@@ -35,11 +38,11 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
       if (!user) return
       const { data: f1 } = await supabase
         .from('follows')
-        .select('profiles!follows_following_id_fkey(id,username,avatar_url,full_name)')
+        .select('profiles!follows_following_id_fkey(id,username,avatar_url,full_name,is_verified,verification_type)')
         .eq('follower_id', user.id).eq('status', 'accepted')
       const { data: f2 } = await supabase
         .from('follows')
-        .select('profiles!follows_follower_id_fkey(id,username,avatar_url,full_name)')
+        .select('profiles!follows_follower_id_fkey(id,username,avatar_url,full_name,is_verified,verification_type)')
         .eq('following_id', user.id).eq('status', 'accepted')
       const l1 = (f1 || []).map((d: any) => d.profiles).filter(Boolean)
       const l2 = (f2 || []).map((d: any) => d.profiles).filter(Boolean)
@@ -140,7 +143,10 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
                 <AvatarFallback>{person.username?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{person.username}</p>
+                <p className="font-semibold text-sm truncate flex items-center gap-1">
+                  {person.username}
+                  {person.is_verified && <VerifiedBadge type={person.verification_type} className="text-xs shrink-0" />}
+                </p>
                 {person.full_name && <p className="text-xs text-muted-foreground truncate">{person.full_name}</p>}
               </div>
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
