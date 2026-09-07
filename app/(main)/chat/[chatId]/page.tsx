@@ -74,7 +74,7 @@ export default function ChatRoomPage() {
   const [canCall, setCanCall] = useState(false)
   const [callStarting, setCallStarting] = useState(false)
   // Resets every time this page mounts - opening an archived chat always
-  // Re-asks for the password, it isn't a one-time unlock.
+  // Re-asks for the password, It isn't a one-time unlock.
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
 
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
