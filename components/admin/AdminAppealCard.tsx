@@ -96,4 +96,4 @@ export function AdminAppealCard({ appeal }: { appeal: AppealWithProfile }) {
       </div>
     </div>
   )
-}
+} 
