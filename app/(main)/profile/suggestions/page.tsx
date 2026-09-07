@@ -41,7 +41,7 @@ export default function SuggestionsPage() {
 
       // Suggestions Privacy (Settings > Privacy > Suggestions Privacy) -
       // separate from Search Result Privacy, so someone can be findable
-      // by search without necessarily being pushed into everyone's
+      // By search without necessarily being pushed into everyone's
       // suggestions feed, or vice versa.
       const ids = candidates.map(p => p.id)
       const [{ data: iFollow }, { data: followMe }, { data: selectedMe }, { data: blockRows }] = await Promise.all([
