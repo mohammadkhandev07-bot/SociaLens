@@ -41,7 +41,7 @@ export function usePendingReportsCount() {
 }
 
 // A small extra detail line for the report - the actual comment/message
-// text, when the target still exists, so the admin doesn't have to go
+// Text, when the target still exists, so the admin doesn't have to go
 // Hunting for context on their own.
 export function useReportTargetPreview(report?: ReportWithProfiles) {
   const supabase = createClient()
