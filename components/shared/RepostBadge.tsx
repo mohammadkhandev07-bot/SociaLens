@@ -19,7 +19,7 @@ interface RepostBadgeProps {
 // Shows who reposted this - One avatar for a single repost, a neat
 // overlapping stack (max 3 shown) plus "and N others" when several
 // different people reposted the same post/reel, so it never collapses
-// down to just one name even when many people reposted it.
+// Down to just one name even when many people reposted it.
 export function RepostBadge({ reposters, variant = 'overlay', className = '' }: RepostBadgeProps) {
   if (!reposters || reposters.length === 0) return null
 
