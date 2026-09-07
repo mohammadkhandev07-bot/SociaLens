@@ -1,7 +1,7 @@
--- ============================================================
+-- ===========================================================
 -- SociaLens - Verification Tick (yellow / blue)
 -- Safe to run more than once.
--- ============================================================
+-- ===========================================================
 
 -- verification_type distinguishes the official yellow tick from an
 -- admin-granted blue tick. is_verified stays in place as a simple
