@@ -81,4 +81,4 @@ export function Sidebar() {
       {showCreate && <CreatePostModal onClose={() => setShowCreate(false)} />}
     </>
   )
-}
+} 
