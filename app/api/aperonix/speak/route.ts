@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { EdgeTTS } from 'edge-tts-universal'
+import { synthesizeEdgeTts } from '@/lib/server/edgeTts'
 import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -42,17 +42,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nothing to speak' }, { status: 400 })
     }
 
-    const tts = new EdgeTTS(cleaned, APERONIX_VOICE, {
+    const audioBuffer = await synthesizeEdgeTts(cleaned, {
+      voice: APERONIX_VOICE,
       // A touch slower and slightly higher reads as warmer/sweeter rather
       // than robotic or flat.
       rate: '-4%',
       pitch: '+8Hz',
       volume: '+0%',
     })
-    const result = await tts.synthesize()
-    const audioBuffer = Buffer.from(await result.audio.arrayBuffer())
 
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: { 'Content-Type': 'audio/mpeg' },
     })
   } catch (error) {
