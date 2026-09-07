@@ -70,4 +70,4 @@ export function AdminSuspendedCard({ account }: { account: Profile }) {
       )}
     </div>
   )
-} 
+}  
