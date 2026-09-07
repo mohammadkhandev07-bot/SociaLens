@@ -32,7 +32,7 @@ const OPTIONS: { value: StoryVisibility; label: string; sub: string; icon: typeo
   { value: 'selected', label: 'Selected people', sub: 'Choose exactly who can see it', icon: ListChecks },
 ]
 
-// Shown right before a text/photo/video story is posted - picks who the
+// Shown right before a text/photo/video story is posted - Picks who the
 // Story is visible to. "Selected people" opens a follower/following search
 // List, same idea as Instagram's Close Friends / hide-from picker.
 export function StoryAudienceModal({ userId, isPending, confirmLabel, onClose, onConfirm }: StoryAudienceModalProps) {
