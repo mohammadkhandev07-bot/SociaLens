@@ -61,7 +61,7 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
       // only a small "reposted" badge indicating this profile shared it.
       const { data: reposts } = await supabase
         .from('reposts')
-        .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url), posts(*, profiles(*))')
+        .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type), posts(*, profiles(*))')
         .eq('user_id', profileId)
         .order('created_at', { ascending: false })
 
