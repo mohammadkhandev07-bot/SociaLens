@@ -16,7 +16,7 @@ interface CommentReactorsDialogProps {
 
 // Owner-only breakdown of exactly who reacted to a comment and with
 // which emoji - never shown to anyone else, no matter how many
-// reactions pile up.
+// Reactions pile up.
 export function CommentReactorsDialog({ target, commentId, open, onOpenChange }: CommentReactorsDialogProps) {
   const { data: reactors = [], isLoading } = useCommentReactors(target, commentId, open)
 
