@@ -16,7 +16,7 @@ const MENU_HEIGHT = 200
 
 interface ChatListItemProps {
   chat: Chat
-  other: { id: string; username: string; avatar_url: string | null } | null | undefined
+  other: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null } | null | undefined
   currentUserId: string
   unread: number
   isPinned: boolean
