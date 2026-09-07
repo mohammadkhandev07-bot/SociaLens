@@ -26,6 +26,8 @@ interface PeerProfile {
   id: string
   username: string
   avatar_url: string | null
+  is_verified?: boolean
+  verification_type?: 'blue' | 'yellow' | null
 }
 
 export type CallPhase = 'idle' | 'outgoing-ringing' | 'incoming-ringing' | 'connecting' | 'permission-prompt' | 'permission-blocked' | 'in-call'
@@ -562,7 +564,7 @@ export function useCallEngine(currentUserId?: string) {
           roleRef.current = 'callee'
           const { data: callerProfile } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url')
+            .select('id, username, avatar_url, is_verified, verification_type')
             .eq('id', row.caller_id)
             .single()
           setCall(row)
@@ -632,7 +634,7 @@ export function useCallEngine(currentUserId?: string) {
           roleRef.current = 'callee'
           const { data: callerProfile } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url')
+            .select('id, username, avatar_url, is_verified, verification_type')
             .eq('id', incoming.caller_id)
             .single()
           setCall(incoming as CallRow)
