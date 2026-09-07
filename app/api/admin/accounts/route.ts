@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/server/requireAdmin'
 
 // Every account shows up here regardless of is_private - privacy controls
 // who else on the platform can see someone's content, it was never meant
-// to hide people from moderation. Search matches username or full name.
+// To hide people from moderation. Search matches username or full name.
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin()
   if (!auth.ok) return auth.error
