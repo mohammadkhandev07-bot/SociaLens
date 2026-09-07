@@ -3,7 +3,7 @@ import WebSocket from 'ws'
 
 // ------------------------------------------------------------------
 // Talks to Microsoft's own "Read Aloud" text-to-speech service - the
-// same free, keyless, neural-voice engine built into Edge's Immersive
+// Same free, keyless, neural-voice engine built into Edge's Immersive
 // Reader. There's no official API for this; every implementation
 // (Python's edge-tts, several Node/Rust ports) works the same way: mimic
 // an Edge browser's WebSocket handshake to Microsoft's speech service.
