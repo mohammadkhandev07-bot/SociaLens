@@ -381,7 +381,7 @@ export type PostWithProfile = Post & {
   /** Set when this post is showing up because someone reposted it - the
    *  post itself still displays the ORIGINAL author's name/avatar as the
    *  owner; this is only used for the small "reposted by" indicator. */
-  reposted_by?: { id: string; username: string; avatar_url: string | null }[] | null
+  reposted_by?: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null }[] | null
   is_reposted?: boolean
   /** Set when this post was added to fill out a thin/empty feed (not
    *  from someone the viewer follows) - lets the UI show a small
