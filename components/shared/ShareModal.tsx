@@ -79,7 +79,7 @@ export function ShareModal({ post, onClose }: ShareModalProps) {
 
       if (!chatId) continue
 
-      // Insert message with post_id
+      // Insert message With post_id
       await supabase.from('messages').insert({
         chat_id: chatId,
         sender_id: user.id,
