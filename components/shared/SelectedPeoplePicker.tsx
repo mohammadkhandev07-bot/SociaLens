@@ -17,7 +17,7 @@ interface Profile {
 
 interface SelectedPeoplePickerProps {
   userId: string
-  /** privacy_selected_users.category this list is stored under. */
+  /** Privacy_selected_users.category this list is stored under. */
   category: string
   emptyHint?: string
 }
