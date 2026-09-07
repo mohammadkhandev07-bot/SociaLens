@@ -66,7 +66,7 @@ export function FollowersModal({ profileId, type, onClose }: FollowersModalProps
           </button>
         </div>
 
-        {/* List */}
+        {/* list */}
         <div className="max-h-96 overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-10">
