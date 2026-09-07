@@ -162,4 +162,4 @@ export function AdminReportCard({ report, actionable }: { report: ReportWithProf
       )}
     </div>
   )
-} 
+}  
