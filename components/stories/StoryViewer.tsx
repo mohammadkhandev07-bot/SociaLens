@@ -41,7 +41,7 @@ interface StoryViewerProps {
 
 // Figures out which scene should be showing right now, given how far into
 // the story's total duration we are - mirrors how the timeline strip laid
-// scenes out one after another in the composer. Works for either text or
+// Scenes out one after another in the composer. Works for either text or
 // Photo scenes since both just need { duration }.
 function getActiveScene<T extends { duration: number }>(scenes: T[] | null, elapsedSeconds: number): T | null {
   if (!scenes || scenes.length === 0) return null
