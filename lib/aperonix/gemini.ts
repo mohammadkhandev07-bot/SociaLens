@@ -13,9 +13,20 @@
 // Any failure that reaches the caller is a plain "Try again later." message -
 // no internal details (status codes, which key, etc.) are ever exposed to the
 // person using the app.
-
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+//
+// IMPORTANT - model pinning: this used to point at 'gemini-flash-latest'.
+// That's an alias Google's own docs describe as getting "hot-swapped" and
+// sometimes routed to an experimental/unstable build behind the scenes -
+// exactly why replies were unreliable ("Try again later" a lot, an
+// occasional lucky success). Gemini's model lineup also gets deprecated
+// on a matter of months (2.5 Flash itself is scheduled to shut down
+// October 16, 2026), so instead of pinning to one name and having this
+// break again down the line, every request tries a short list of current
+// models in order and moves to the next one on any failure - the first
+// one that actually answers wins. Update GEMINI_MODEL_CANDIDATES here if
+// Google deprecates one of these down the road.
+const GEMINI_MODEL_CANDIDATES = ['gemini-3.5-flash', 'gemini-2.5-flash']
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export interface GeminiTextPart {
   text: string
@@ -81,24 +92,31 @@ export function getKeysForRole(role: GeminiRole): string[] {
   return [getPrimaryKey(role), ...getBackupKeys()].filter(Boolean) as string[]
 }
 
-async function requestGemini(apiKey: string, systemPrompt: string, contents: GeminiMessage[], tools?: GeminiTool[]) {
+async function requestGemini(apiKey: string, model: string, systemPrompt: string, contents: GeminiMessage[], tools?: GeminiTool[]) {
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     ...(tools ? { tools } : {}),
     generationConfig: {
-      temperature: 0.9,
+      // Gemini's own docs recommend leaving temperature/top_p/top_k at
+      // their defaults on the current model generation - its reasoning
+      // is tuned around those defaults, and overriding them tends to hurt
+      // more than it helps. maxOutputTokens is just a length cap, safe to
+      // keep custom.
       maxOutputTokens: 1024,
     },
   })
 
-  // Retry the same key a couple of times for transient 503 (overloaded) / 429
-  // (rate limited) errors before giving up on it and trying the backup key.
+  // Retry the same key+model a couple of times for transient 503
+  // (overloaded) / 429 (rate limited) errors before giving up and trying
+  // the next one. A 404 (wrong/deprecated model name) is NOT retried here -
+  // that's on the caller to try the next model candidate instead, since
+  // retrying the identical request would just 404 again.
   const maxAttempts = 2
   let lastStatus = 0
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    const response = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -107,6 +125,7 @@ async function requestGemini(apiKey: string, systemPrompt: string, contents: Gem
     if (response.ok) return response.json()
 
     lastStatus = response.status
+    if (response.status === 404) break // wrong/deprecated model - no point retrying this same call
     const isRetryable = response.status === 503 || response.status === 429
     if (!isRetryable || attempt === maxAttempts) break
     await new Promise(resolve => setTimeout(resolve, attempt * 700))
@@ -119,7 +138,8 @@ async function requestGemini(apiKey: string, systemPrompt: string, contents: Gem
 
 /**
  * Calls Gemini using the key assigned to `role`, automatically falling back
- * through the backup keys (in order) if that fails. Returns the raw `content`
+ * through the backup keys (in order), and within each key through the
+ * candidate model list, if a request fails. Returns the raw `content`
  * object of the first candidate. Throws a generic "Try again later." error on
  * total failure - never leaks internal details to the caller.
  */
@@ -138,12 +158,15 @@ export async function callGemini(
 
   let data: any = null
 
+  outer:
   for (const key of keysToTry) {
-    try {
-      data = await requestGemini(key, systemPrompt, contents, tools)
-      break
-    } catch (err) {
-      console.error(`Aperonix: Gemini call failed on a "${role}"-role key, trying the next one if available.`, err)
+    for (const model of GEMINI_MODEL_CANDIDATES) {
+      try {
+        data = await requestGemini(key, model, systemPrompt, contents, tools)
+        break outer
+      } catch (err) {
+        console.error(`Aperonix: Gemini call failed on a "${role}"-role key with model "${model}", trying the next option if available.`, err)
+      }
     }
   }
 
