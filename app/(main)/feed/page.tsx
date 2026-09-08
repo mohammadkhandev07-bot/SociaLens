@@ -39,7 +39,7 @@ export default function FeedPage() {
       {/* Stories */}
       <StoriesBar />
 
-      {/* Feed */}
+      {/* feed */}
       <div>
         {isLoading
           ? Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)
