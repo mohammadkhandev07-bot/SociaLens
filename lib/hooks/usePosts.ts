@@ -24,7 +24,7 @@ async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
 }
 
 // Loads the feed page by page (10 posts at a time, newest first) instead
-// of pulling everything a person follows into memory on every visit -
+// Of pulling everything a person follows into memory on every visit -
 // the same "load more as you scroll" behavior Instagram/Facebook use.
 // Own posts and reposts are two separate tables, so each page pulls a
 // batch from both (bounded by the same cursor), merges them by date, and
