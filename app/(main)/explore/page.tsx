@@ -51,7 +51,7 @@ export default function ExplorePage() {
       const followsMeSet = new Set((followMe || []).map((r: any) => r.follower_id))
       const selectedMeSet = new Set((selectedMe || []).map((r: any) => r.owner_id))
       // Anyone on either side of a block with me never shows up in search,
-      // regardless of their search_privacy setting.
+      // Regardless of their search_privacy setting.
       const blockedRelationSet = new Set(
         (blockRows || []).flatMap((b: any) => [b.blocker_id, b.blocked_id]).filter((id: string) => id !== user.id)
       )
