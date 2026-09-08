@@ -594,10 +594,15 @@ export default function AperonixPage() {
                     )
                   )}
                   {regeneratingId === msg.id ? (
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                    <span className="flex items-center py-1">
+                      <Image
+                        src="/images/aperonix-logo.png"
+                        alt="Aperonix is thinking"
+                        width={20}
+                        height={20}
+                        className="rounded-full animate-spin"
+                        style={{ animationDuration: '1.2s' }}
+                      />
                     </span>
                   ) : msg.content}
                 </div>
@@ -676,10 +681,15 @@ export default function AperonixPage() {
 
           {sending && (
             <div className="flex justify-start">
-              <div className="bg-muted rounded-2xl px-4 py-2.5 text-sm flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+              <div className="bg-muted rounded-2xl px-4 py-2.5 flex items-center">
+                <Image
+                  src="/images/aperonix-logo.png"
+                  alt="Aperonix is thinking"
+                  width={22}
+                  height={22}
+                  className="rounded-full animate-spin"
+                  style={{ animationDuration: '1.2s' }}
+                />
               </div>
             </div>
           )}
