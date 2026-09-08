@@ -1,26 +1,47 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Message } from '@/lib/types/database.types'
+
+// How many messages load at once - matches roughly what fits on a phone
+// screen a few times over. Older messages only get fetched when someone
+// actually scrolls up to them, the same way Instagram/WhatsApp do it,
+// instead of pulling a chat's entire history into memory on open.
+const PAGE_SIZE = 40
 
 export function useRealtimeMessages(chatId: string, currentUserId: string) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<string[]>([])
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
+  const [hasMoreOlder, setHasMoreOlder] = useState(false)
   const supabase = createClient()
+
+  // Tracked outside React state (refs, not state) purely so
+  // loadOlderMessages below always reads the current cursor/flag without
+  // needing to be recreated every time the message list changes.
+  const oldestLoadedAtRef = useRef<string | null>(null)
+  const hasMoreOlderRef = useRef(false)
+  const loadingOlderRef = useRef(false)
 
   useEffect(() => {
     if (!chatId) return
 
-    // Load initial messages
+    // Load only the most recent page of messages, not the whole history.
     const loadMessages = async () => {
       const { data } = await supabase
         .from('messages')
         .select('*')
         .eq('chat_id', chatId)
-        .order('created_at', { ascending: true })
-      if (data) setMessages(data)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+      if (!data) return
+      const ordered = [...data].reverse()
+      setMessages(ordered)
+      oldestLoadedAtRef.current = ordered[0]?.created_at ?? null
+      hasMoreOlderRef.current = data.length === PAGE_SIZE
+      setHasMoreOlder(hasMoreOlderRef.current)
     }
     loadMessages()
 
@@ -31,7 +52,9 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
     // causes "message only shows up after I refresh the page". This
     // Re-fetches the last few messages every few seconds and merges in
     // anything realtime missed, so a message never has to wait for a
-    // manual refresh - at most a few seconds behind, never stuck.
+    // manual refresh - at most a few seconds behind, never stuck. Only
+    // ever touches the most recent handful of messages, so this stays
+    // cheap no matter how long the chat's full history is.
     const backstopPoll = async () => {
       const { data } = await supabase
         .from('messages')
@@ -144,6 +167,39 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
     })
   }, [chatId, currentUserId])
 
+  // Fetches the next page of older messages (before whatever's currently
+  // the oldest loaded one) and prepends them - called when the person
+  // scrolls up to the top of what's loaded so far.
+  const loadOlderMessages = useCallback(async () => {
+    if (!chatId || loadingOlderRef.current || !hasMoreOlderRef.current || !oldestLoadedAtRef.current) return
+    loadingOlderRef.current = true
+    setIsLoadingOlder(true)
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .lt('created_at', oldestLoadedAtRef.current)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+      if (data && data.length > 0) {
+        const ordered = [...data].reverse()
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id))
+          return [...ordered.filter((m) => !existingIds.has(m.id)), ...prev]
+        })
+        oldestLoadedAtRef.current = ordered[0]?.created_at ?? oldestLoadedAtRef.current
+        hasMoreOlderRef.current = data.length === PAGE_SIZE
+      } else {
+        hasMoreOlderRef.current = false
+      }
+      setHasMoreOlder(hasMoreOlderRef.current)
+    } finally {
+      loadingOlderRef.current = false
+      setIsLoadingOlder(false)
+    }
+  }, [chatId])
+
   const sendMessage = useCallback(
     async (payload: {
       content?: string
@@ -223,5 +279,16 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)))
   }, [])
 
-  return { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally }
+  return {
+    messages,
+    isTyping,
+    onlineUsers,
+    sendMessage,
+    sendTypingIndicator,
+    removeMessageLocally,
+    patchMessageLocally,
+    loadOlderMessages,
+    hasMoreOlder,
+    isLoadingOlder,
+  }
 }
