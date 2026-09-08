@@ -45,7 +45,7 @@ export default function ChatRoomPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally } =
+  const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
     useRealtimeMessages(chatId, user?.id ?? '')
   const { data: storyGroups = [] } = useActiveStories(user?.id)
 
@@ -74,7 +74,7 @@ export default function ChatRoomPage() {
   const [canCall, setCanCall] = useState(false)
   const [callStarting, setCallStarting] = useState(false)
   // Resets every time this page mounts - opening an archived chat always
-  // Re-asks for the password, It isn't a one-time unlock.
+  // Re-asks for the password, it isn't a one-time unlock.
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
 
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
@@ -352,6 +352,9 @@ export default function ChatRoomPage() {
         isMessageUnavailable={isMessageUnavailable}
         wallpaperUrl={wallpaper?.wallpaper_url}
         wallpaperPosition={wallpaper ? { x: wallpaper.position_x, y: wallpaper.position_y } : undefined}
+        onLoadOlder={loadOlderMessages}
+        hasMoreOlder={hasMoreOlder}
+        isLoadingOlder={isLoadingOlder}
       />
 
       {/* Input */}
