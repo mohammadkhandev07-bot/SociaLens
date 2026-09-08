@@ -16,7 +16,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   // Middleware already verified this request is authenticated (a network
   // round-trip to Supabase's auth server) before this page even started
   // rendering - getSession() here just reads that already-validated
-  // session back out of the cookie locally, instead of paying for a
+  // Session back out of the cookie locally, instead of paying for a
   // second full auth-server round-trip for the exact same check.
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user ?? null
