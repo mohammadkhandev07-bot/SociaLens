@@ -6,7 +6,8 @@ import { useUser } from '@/lib/hooks/useUser'
 
 export default function ReelsPage() {
   const { user } = useUser()
-  const { data: reels = [], isLoading } = useReelsPosts(user?.id)
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useReelsPosts(user?.id)
+  const reels = data?.pages.flatMap(page => page.posts) ?? []
 
   return (
     <div className="flex justify-center items-center bg-black h-[100dvh] lg:h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -17,7 +18,7 @@ export default function ReelsPage() {
           content taller than the viewport used to leak out and scroll the
           page itself along with it. */}
       <div className="relative bg-black w-full h-full lg:max-w-[420px] lg:h-[92%] lg:rounded-xl lg:overflow-hidden">
-        <ReelsFeed reels={reels} isLoading={isLoading} />
+        <ReelsFeed reels={reels} isLoading={isLoading} onLoadMore={fetchNextPage} hasMore={!!hasNextPage} isLoadingMore={isFetchingNextPage} />
       </div>
     </div>
   )
