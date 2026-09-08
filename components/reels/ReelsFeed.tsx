@@ -8,6 +8,9 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 interface ReelsFeedProps {
   reels: PostWithProfile[]
   isLoading: boolean
+  onLoadMore?: () => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
 }
 
 // Only one ad instance actually loads the real Adsterra script + container at a
@@ -62,10 +65,19 @@ function SponsoredCard() {
   )
 }
 
-export function ReelsFeed({ reels, isLoading }: ReelsFeedProps) {
+export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore }: ReelsFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Fetches the next batch of reels once someone's a couple videos out
+  // from the end of what's loaded - matches the "keep the next few ready
+  // before you get there" prefetch feel of Reels/Shorts, instead of
+  // pulling every video up front on open.
+  useEffect(() => {
+    if (!onLoadMore || !hasMore || isLoadingMore) return
+    if (activeIndex >= reels.length - 3) onLoadMore()
+  }, [activeIndex, reels.length, onLoadMore, hasMore, isLoadingMore])
 
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return
