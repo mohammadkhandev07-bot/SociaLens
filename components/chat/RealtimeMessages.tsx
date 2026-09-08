@@ -31,7 +31,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
   // fix-up effect below knows to restore where the person was looking
   // (rather than the "new message → jump to bottom" effect firing
   // instead, which would yank them down to the newest message every
-  // time they scroll up to load more history).
+  // Time they scroll up to load more history).
   const pendingOlderScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null)
   const [localMessages, setLocalMessages] = useState<Message[]>(messages)
 
