@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { Message } from '@/lib/types/database.types'
 
@@ -16,13 +17,22 @@ interface RealtimeMessagesProps {
   isMessageUnavailable?: (senderId: string) => boolean
   wallpaperUrl?: string | null
   wallpaperPosition?: { x: number; y: number }
+  onLoadOlder?: () => void
+  hasMoreOlder?: boolean
+  isLoadingOlder?: boolean
 }
 
-export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition }: RealtimeMessagesProps) {
+export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition, onLoadOlder, hasMoreOlder, isLoadingOlder }: RealtimeMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMessageIdRef = useRef<string | null>(null)
   const hasDoneInitialScrollRef = useRef(false)
+  // Set right before requesting older messages, so the scroll-position
+  // fix-up effect below knows to restore where the person was looking
+  // (rather than the "new message → jump to bottom" effect firing
+  // instead, which would yank them down to the newest message every
+  // time they scroll up to load more history).
+  const pendingOlderScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null)
   const [localMessages, setLocalMessages] = useState<Message[]>(messages)
 
   useEffect(() => {
@@ -58,6 +68,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
   // scrolled up reading older messages.
   useEffect(() => {
     if (!hasDoneInitialScrollRef.current) return
+    if (pendingOlderScrollRef.current) return // handled by the effect below instead
     const lastMsg = localMessages[localMessages.length - 1]
     const isNewMessage = !!lastMsg && lastMsg.id !== lastMessageIdRef.current
     lastMessageIdRef.current = lastMsg?.id ?? null
@@ -67,9 +78,33 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
     }
   }, [localMessages, isTyping])
 
+  // After older messages get prepended, the browser would otherwise keep
+  // the same scrollTop - which now points at a completely different
+  // (much later) spot since a bunch of content just got added above it.
+  // This restores the person's exact viewing position by measuring how
+  // much taller the content got and adjusting scrollTop by that amount.
+  useLayoutEffect(() => {
+    const pending = pendingOlderScrollRef.current
+    const el = containerRef.current
+    if (!pending || !el) return
+    const heightDiff = el.scrollHeight - pending.scrollHeight
+    el.scrollTop = pending.scrollTop + heightDiff
+    pendingOlderScrollRef.current = null
+  }, [localMessages])
+
+  const handleScroll = () => {
+    const el = containerRef.current
+    if (!el || !onLoadOlder || !hasMoreOlder || isLoadingOlder) return
+    if (el.scrollTop < 150) {
+      pendingOlderScrollRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop }
+      onLoadOlder()
+    }
+  }
+
   return (
     <div
       ref={containerRef}
+      onScroll={handleScroll}
       className="flex-1 overflow-y-auto p-4 bg-no-repeat"
       style={
         wallpaperUrl
@@ -81,6 +116,11 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           : undefined
       }
     >
+      {isLoadingOlder && (
+        <div className="flex justify-center py-2">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
       {localMessages.map((msg) => (
         <ChatMessage
           key={msg.id}
