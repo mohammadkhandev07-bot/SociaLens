@@ -1,12 +1,12 @@
 'use client'
 
-// Read-aloud tries Edge TTS first (via /api/aperonix/speak - free, no key,
-// no signup, a genuinely natural neural voice) so Aperonix always sounds
-// like the same warm female voice everywhere: reading its own replies,
-// speaking back during a voice-mode conversation, and reading a person's
-// own chat messages aloud. If that route is ever unreachable, it falls
-// back to the browser's own built-in voice with no visible error, so
-// something always gets read out loud either way.
+// Read-aloud uses the browser's own built-in voice directly - always has,
+// this file used to try Microsoft's Edge TTS service first (via
+// /api/aperonix/speak) and only fall back to the browser voice if that
+// failed, but Microsoft's side of that workaround is unreliable enough
+// that people were routinely waiting out a long timeout before ever
+// hearing anything. The browser's native voice is instant and "good
+// enough" is much better than "great, but usually late."
 // Voice input (speech-to-text) always uses the browser's native API -
 // support varies: best in Chrome/Edge, not available in Firefox.
 
@@ -76,8 +76,6 @@ interface SpeakHandle {
   stop: () => void
 }
 
-// The browser-voice safety net - only used if the Edge TTS API route
-// couldn't produce audio for some reason.
 async function speakWithBrowserVoice(cleaned: string, onEnd: () => void): Promise<SpeakHandle> {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     onEnd()
@@ -109,30 +107,6 @@ export async function speakText(
   if (!cleaned) {
     onEnd()
     return { stop: () => {} }
-  }
-
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 20000)
-    const res = await fetch('/api/aperonix/speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleaned }),
-      signal: controller.signal,
-    })
-    clearTimeout(timeout)
-
-    if (res.ok) {
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-      audio.onended = () => { URL.revokeObjectURL(url); onEnd() }
-      audio.onerror = () => { URL.revokeObjectURL(url); onEnd() }
-      await audio.play()
-      return { stop: () => { audio.pause(); URL.revokeObjectURL(url) } }
-    }
-  } catch {
-    // Network error, timeout, etc. - fall through to the browser voice below.
   }
 
   return speakWithBrowserVoice(cleaned, onEnd)
