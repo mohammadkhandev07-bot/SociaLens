@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { Profile, PostWithProfile } from '@/lib/types/database.types'
 import { cn } from '@/lib/utils/helpers'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
 
@@ -27,7 +28,8 @@ export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('all')
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
   const { user } = useUser()
-  const { data: posts = [], isLoading: postsLoading } = useExplorePosts(user?.id)
+  const { data: explorePages, isLoading: postsLoading, fetchNextPage: fetchNextExplorePage, hasNextPage: hasMoreExplore, isFetchingNextPage: isFetchingMoreExplore } = useExplorePosts(user?.id)
+  const posts = explorePages?.pages.flatMap(page => page.posts) ?? []
   const supabase = createClient()
 
   const { data: searchProfiles = [] } = useQuery({
@@ -49,7 +51,7 @@ export default function ExplorePage() {
       const followsMeSet = new Set((followMe || []).map((r: any) => r.follower_id))
       const selectedMeSet = new Set((selectedMe || []).map((r: any) => r.owner_id))
       // Anyone on either side of a block with me never shows up in search,
-      // Regardless of their search_privacy setting.
+      // regardless of their search_privacy setting.
       const blockedRelationSet = new Set(
         (blockRows || []).flatMap((b: any) => [b.blocker_id, b.blocked_id]).filter((id: string) => id !== user.id)
       )
@@ -231,6 +233,7 @@ export default function ExplorePage() {
           )}
           <div className="px-4 pb-2"><h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5"><Grid3x3 className="h-3.5 w-3.5" /> Trending Posts</h3></div>
           {postsLoading ? Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />) : posts.map(post => <PostCard key={post.id} post={post} />)}
+          <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore} isLoading={isFetchingMoreExplore} />
         </div>
       )}
     </div>
