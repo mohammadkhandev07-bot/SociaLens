@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import Image from 'next/image'
 import { Grid3x3, Film, Lock, X, Play, Heart, MessageCircle, Send, MoreVertical, Trash2, Share2, Repeat2, Eye, Flag } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo } from '@/lib/utils/helpers'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 
 interface ProfileTabsProps {
   profileId: string
@@ -45,25 +46,34 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
   const { data: isReposted = false } = useIsReposted(selectedPost?.id ?? '', user?.id)
   const toggleRepost = useToggleRepost()
 
-  const { data: posts = [], isLoading } = useQuery({
+  const PROFILE_PAGE_SIZE = 24
+
+  const { data: postPages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ['profile-posts', profileId],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      let ownQuery = supabase
         .from('posts')
         .select('*, profiles(*)')
         .eq('user_id', profileId)
         .order('created_at', { ascending: false })
+        .limit(PROFILE_PAGE_SIZE)
+      if (pageParam) ownQuery = ownQuery.lt('created_at', pageParam)
+      const { data, error } = await ownQuery
       if (error) throw error
       const ownPosts = data as PostWithProfile[]
 
       // Posts this profile reposted also show up in their grid - still
       // showing the ORIGINAL author's name/photo as the post owner, with
       // only a small "reposted" badge indicating this profile shared it.
-      const { data: reposts } = await supabase
+      let repostQuery = supabase
         .from('reposts')
         .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type), posts(*, profiles(*))')
         .eq('user_id', profileId)
         .order('created_at', { ascending: false })
+        .limit(PROFILE_PAGE_SIZE)
+      if (pageParam) repostQuery = repostQuery.lt('created_at', pageParam)
+      const { data: reposts } = await repostQuery
 
       const repostedPosts: PostWithProfile[] = (reposts || [])
         .filter((r: any) => r.posts)
@@ -73,12 +83,18 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
           reposted_by: [r.profiles],
         }))
 
-      return [...ownPosts, ...repostedPosts].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
+      const merged = [...ownPosts, ...repostedPosts]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, PROFILE_PAGE_SIZE)
+
+      const gotFullPage = ownPosts.length === PROFILE_PAGE_SIZE || repostedPosts.length === PROFILE_PAGE_SIZE
+      const oldest = merged.length > 0 ? merged[merged.length - 1].created_at : null
+      return { posts: merged, nextCursor: gotFullPage ? oldest : null }
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: canView,
   })
+  const posts = postPages?.pages.flatMap(page => page.posts) ?? []
 
   const openPost = async (post: PostWithProfile) => {
     setSelectedPost(post)
@@ -258,6 +274,7 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
               ))}
             </div>
           )}
+          <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
         </TabsContent>
 
         <TabsContent value="reels">
@@ -290,6 +307,7 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
               ))}
             </div>
           )}
+          <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
         </TabsContent>
       </Tabs>
 
