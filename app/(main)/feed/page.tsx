@@ -9,10 +9,12 @@ import { useFeedPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
+import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 
 export default function FeedPage() {
   const { user } = useUser()
-  const { data: posts = [], isLoading } = useFeedPosts(user?.id)
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useFeedPosts(user?.id)
+  const posts = data?.pages.flatMap(page => page.posts) ?? []
   const supabase = createClient()
   const queryClient = useQueryClient()
 
@@ -68,6 +70,7 @@ export default function FeedPage() {
             })
         }
       </div>
+      <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
     </div>
   )
 }
