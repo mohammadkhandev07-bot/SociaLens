@@ -1,8 +1,12 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
+
+const FEED_PAGE_SIZE = 10
+const EXPLORE_PAGE_SIZE = 15
+const REELS_PAGE_SIZE = 8
 
 async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   const supabase = createClient()
@@ -19,13 +23,22 @@ async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   return posts.map(p => ({ ...p, is_liked: likedSet.has(p.id) }))
 }
 
+// Loads the feed page by page (10 posts at a time, newest first) instead
+// of pulling everything a person follows into memory on every visit -
+// the same "load more as you scroll" behavior Instagram/Facebook use.
+// Own posts and reposts are two separate tables, so each page pulls a
+// batch from both (bounded by the same cursor), merges them by date, and
+// only keeps the top page-size worth - the cursor for the next page is
+// simply the oldest item actually shown, so nothing gets skipped or
+// repeated at the boundary between pages.
 export function useFeedPosts(userId?: string) {
   const supabase = createClient()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['feed-posts', userId],
-    queryFn: async () => {
-      if (!userId) return []
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      if (!userId) return { posts: [] as PostWithProfile[], nextCursor: null as string | null }
 
       const { data: following } = await supabase
         .from('follows')
@@ -36,13 +49,14 @@ export function useFeedPosts(userId?: string) {
       const followingIds = following?.map(f => f.following_id) ?? []
       followingIds.push(userId)
 
-      const { data, error } = await supabase
+      let ownQuery = supabase
         .from('posts')
         .select('*, profiles(*)')
         .in('user_id', followingIds)
         .order('created_at', { ascending: false })
-        .limit(50)
-
+        .limit(FEED_PAGE_SIZE)
+      if (pageParam) ownQuery = ownQuery.lt('created_at', pageParam)
+      const { data, error } = await ownQuery
       if (error) throw error
       const ownPosts = await fetchPostsWithLikes(data as PostWithProfile[], userId)
 
@@ -50,13 +64,15 @@ export function useFeedPosts(userId?: string) {
       // in the feed - the post itself still displays the ORIGINAL
       // author's name/avatar, only a small "X reposted" badge on top
       // Shows who reposted it. Sorted into the feed by when it was
-      // Reposted, not when the original post was first made.
-      const { data: reposts } = await supabase
+      // reposted, not when the original post was first made.
+      let repostQuery = supabase
         .from('reposts')
         .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type), posts(*, profiles(*))')
         .in('user_id', followingIds)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(FEED_PAGE_SIZE)
+      if (pageParam) repostQuery = repostQuery.lt('created_at', pageParam)
+      const { data: reposts } = await repostQuery
 
       const repostedPosts: PostWithProfile[] = (reposts || [])
         .filter((r: any) => r.posts)
@@ -67,18 +83,21 @@ export function useFeedPosts(userId?: string) {
         }))
       const repostedWithLikes = await fetchPostsWithLikes(repostedPosts, userId)
 
-      const merged = [...ownPosts, ...repostedWithLikes]
+      let merged = [...ownPosts, ...repostedWithLikes]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, FEED_PAGE_SIZE)
 
       // The feed should never sit empty just because you don't follow
       // anyone yet (or the people you follow haven't posted much) - once
-      // it's running thin, top it up with public posts from everyone
-      // else, the same way Instagram fills your feed with "Suggested"
-      // content. Row Level Security still applies here, so private
-      // accounts and restricted post_privacy settings stay hidden exactly
-      // like they do everywhere else in the app.
+      // it's running thin on the very first page, top it up with public
+      // posts from everyone else, the same way Instagram fills your feed
+      // with "Suggested" content. Row Level Security still applies here,
+      // so private accounts and restricted post_privacy settings stay
+      // hidden exactly like they do everywhere else in the app. Only
+      // done on the first page - later pages just end once real
+      // followed/reposted content runs out.
       const MIN_FEED_SIZE = 5
-      if (merged.length < MIN_FEED_SIZE) {
+      if (!pageParam && merged.length < MIN_FEED_SIZE) {
         const excludeIds = merged.map((p) => p.id)
         let suggestedQuery = supabase
           .from('posts')
@@ -92,33 +111,47 @@ export function useFeedPosts(userId?: string) {
         if (suggested && suggested.length > 0) {
           const suggestedWithLikes = await fetchPostsWithLikes(suggested as PostWithProfile[], userId)
           const tagged = suggestedWithLikes.map((p) => ({ ...p, is_suggested: true }))
-          return [...merged, ...tagged]
+          merged = [...merged, ...tagged]
         }
       }
 
-      return merged
+      // Next page starts just before the oldest post shown here. Fewer
+      // than a full page from BOTH sources means there's nothing older
+      // left to fetch.
+      const gotFullPage = ownPosts.length === FEED_PAGE_SIZE || repostedWithLikes.length === FEED_PAGE_SIZE
+      const oldest = merged.length > 0 ? merged[merged.length - 1].created_at : null
+      return { posts: merged, nextCursor: gotFullPage ? oldest : null }
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!userId,
     staleTime: 30000,
   })
 }
 
+// Explore's "most liked" grid, paged in the same spirit - fetches by
+// engagement rank rather than time, so the cursor here is a row offset
+// instead of a timestamp.
 export function useExplorePosts(userId?: string) {
   const supabase = createClient()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['explore-posts', userId],
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const { data, error } = await supabase
         .from('posts')
         .select('*, profiles(*)')
         .order('likes_count', { ascending: false })
-        .limit(30)
+        .range(pageParam, pageParam + EXPLORE_PAGE_SIZE - 1)
 
       if (error) throw error
-      if (!userId) return data as PostWithProfile[]
-      return fetchPostsWithLikes(data as PostWithProfile[], userId)
+      const posts = userId ? await fetchPostsWithLikes(data as PostWithProfile[], userId) : (data as PostWithProfile[])
+      return {
+        posts,
+        nextCursor: data.length === EXPLORE_PAGE_SIZE ? pageParam + EXPLORE_PAGE_SIZE : null,
+      }
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30000,
   })
 }
@@ -126,20 +159,25 @@ export function useExplorePosts(userId?: string) {
 export function useReelsPosts(userId?: string) {
   const supabase = createClient()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['reels-posts', userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      let query = supabase
         .from('posts')
         .select('*, profiles(*)')
         .eq('media_type', 'video')
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(REELS_PAGE_SIZE)
+      if (pageParam) query = query.lt('created_at', pageParam)
+      const { data, error } = await query
 
       if (error) throw error
       let posts = data as PostWithProfile[]
       if (userId) posts = await fetchPostsWithLikes(posts, userId)
-      if (!userId || posts.length === 0) return posts
+      const nextCursor = data.length === REELS_PAGE_SIZE ? (posts[posts.length - 1]?.created_at ?? null) : null
+
+      if (!userId || posts.length === 0) return { posts, nextCursor }
 
       // Reels already show everyone's videos (not just people you follow),
       // so reposts don't need a separate duplicate entry here like the
@@ -152,7 +190,7 @@ export function useReelsPosts(userId?: string) {
         .eq('follower_id', userId)
         .eq('status', 'accepted')
       const followingIds = (following || []).map(f => f.following_id)
-      if (followingIds.length === 0) return posts
+      if (followingIds.length === 0) return { posts, nextCursor }
 
       const { data: reposts } = await supabase
         .from('reposts')
@@ -161,7 +199,7 @@ export function useReelsPosts(userId?: string) {
         .in('user_id', followingIds)
         .order('created_at', { ascending: false })
 
-      if (!reposts || reposts.length === 0) return posts
+      if (!reposts || reposts.length === 0) return { posts, nextCursor }
       // Multiple people you follow can repost the same reel - collect ALL of
       // them per post (most recent first) instead of overwriting down to
       // just the last one, so the "X reposted" badge can show everyone.
@@ -171,8 +209,10 @@ export function useReelsPosts(userId?: string) {
         existing.push(r.profiles)
         repostMap.set(r.post_id, existing)
       }
-      return posts.map(p => repostMap.has(p.id) ? { ...p, reposted_by: repostMap.get(p.id) } : p)
+      const withReposts = posts.map(p => repostMap.has(p.id) ? { ...p, reposted_by: repostMap.get(p.id) } : p)
+      return { posts: withReposts, nextCursor }
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30000,
   })
 }
