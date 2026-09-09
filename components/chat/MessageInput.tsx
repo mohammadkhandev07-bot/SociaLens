@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Send, X, Smile, Mic, Square, Image as ImageIcon, Sticker as StickerIcon, Trash2, Loader2 } from 'lucide-react'
 import { Message } from '@/lib/types/database.types'
+import { createClient } from '@/lib/supabase/client'
 import { FullEmojiPicker } from './FullEmojiPicker'
 import { StickerPicker } from './StickerPicker'
 import { getClampedPopupPosition } from '@/lib/utils/popupPosition'
@@ -19,6 +20,7 @@ export interface SendPayload {
 interface MessageInputProps {
   onSend: (payload: SendPayload) => void
   onTyping: () => void
+  currentUserId: string
   disabled?: boolean
   replyingTo?: Message | null
   onCancelReply?: () => void
@@ -37,17 +39,26 @@ function getVideoDuration(file: File): Promise<number> {
   })
 }
 
-async function uploadChatMedia(file: File | Blob, filename: string): Promise<string> {
-  const formData = new FormData()
-  formData.append('file', file, filename)
-  formData.append('bucket', 'chat-media')
-  const res = await fetch('/api/upload', { method: 'POST', body: formData })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Upload failed')
-  return data.url as string
+async function uploadChatMedia(file: File | Blob, filename: string, userId: string): Promise<string> {
+  // Uploaded straight from the browser to Supabase Storage rather than
+  // routed through a server API endpoint - a server route's request body
+  // gets rejected by the hosting platform's size limit well before a
+  // video or a longer voice message would actually hit this app's own
+  // 50MB cap, so going straight to storage is what actually lets a real
+  // video/voice-message get through in production.
+  const supabase = createClient()
+  const ext = filename.split('.').pop() || 'bin'
+  const path = `${userId}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('chat-media').upload(path, file, {
+    cacheControl: '31536000',
+    contentType: file instanceof File ? file.type : 'audio/webm',
+  })
+  if (error) throw new Error(error.message || 'Upload failed')
+  const { data } = supabase.storage.from('chat-media').getPublicUrl(path)
+  return data.publicUrl
 }
 
-export function MessageInput({ onSend, onTyping, disabled, replyingTo, onCancelReply }: MessageInputProps) {
+export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyingTo, onCancelReply }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
@@ -174,7 +185,7 @@ export function MessageInput({ onSend, onTyping, disabled, replyingTo, onCancelR
       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
       setSending(true)
       try {
-        const url = await uploadChatMedia(blob, `voice-${Date.now()}.webm`)
+        const url = await uploadChatMedia(blob, `voice-${Date.now()}.webm`, currentUserId)
         onSend({ mediaUrl: url, mediaType: 'audio', durationSeconds: duration, replyToId: replyingTo?.id })
         onCancelReply?.()
       } catch {
@@ -207,7 +218,7 @@ export function MessageInput({ onSend, onTyping, disabled, replyingTo, onCancelR
     if (attachedFile) {
       setSending(true)
       try {
-        const url = await uploadChatMedia(attachedFile, attachedFile.name)
+        const url = await uploadChatMedia(attachedFile, attachedFile.name, currentUserId)
         onSend({ content: text, mediaUrl: url, mediaType: attachedType!, replyToId: replyingTo?.id })
         setMessage('')
         clearAttachment()
