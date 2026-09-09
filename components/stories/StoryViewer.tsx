@@ -7,6 +7,7 @@ import { X, Music, MoreVertical, Heart, MessageCircle, Send, Pencil, EyeOff, Tra
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
 import { useDeleteStory } from '@/lib/hooks/useStories'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import type { StoryGroup } from '@/lib/hooks/useStories'
 import {
   STORY_REACTION_EMOJIS,
@@ -70,6 +71,7 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
   const [showMenu, setShowMenu] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showHideViewers, setShowHideViewers] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [showReactionBar, setShowReactionBar] = useState(false)
@@ -86,7 +88,7 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = showMenu || showEditModal || showHideViewers || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0
+  const paused = showMenu || showEditModal || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -324,7 +326,7 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
   }, [groupIndex, storyIndex, activeMusicUrl])
 
   const handleDelete = async () => {
-    setShowMenu(false)
+    setShowDeleteConfirm(false)
     audioRef.current?.pause()
     await deleteStory.mutateAsync({ storyId: story.id, mediaUrl: story.media_url })
     if (group.stories.length <= 1) {
@@ -426,7 +428,7 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
                         <EyeOff className="h-4 w-4" /> Hide Story from...
                       </button>
                       <button
-                        onClick={handleDelete}
+                        onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }}
                         className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
                       >
                         <Trash2 className="h-4 w-4" /> Delete Story
@@ -765,6 +767,16 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
           targetType="story"
           targetId={story.id}
           onClose={() => setShowReport(false)}
+        />
+      )}
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete this story?"
+          description="This can't be undone. Your story will be permanently removed."
+          confirmLabel="Delete"
+          loading={deleteStory.isPending}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
         />
       )}
     </div>
