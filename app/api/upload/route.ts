@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const ALLOWED_BUCKETS = ['posts', 'avatars', 'covers', 'stories', 'chat-media', 'chat-wallpapers', 'appeals'] as const
+const ALLOWED_BUCKETS = ['posts', 'avatars', 'covers', 'stories', 'chat-media', 'chat-wallpapers', 'appeals', 'contact-support'] as const
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime', 'audio/webm', 'audio/mpeg', 'audio/ogg']
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50MB - Generous for a short video/voice note, still bounds storage abuse
 
