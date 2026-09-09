@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, ChevronRight, Smartphone, User, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { LogOut, ChevronRight, Smartphone, User, ShieldCheck, ShieldAlert, Headset } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useUser } from '@/lib/hooks/useUser'
@@ -100,6 +100,23 @@ export default function SettingsPage() {
               <div>
                 <span className="text-sm font-medium block">Privacy Settings</span>
                 <span className="text-xs text-muted-foreground">Account privacy, policy & terms</span>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Support */}
+      <Card>
+        <CardContent className="pt-4 divide-y">
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide pb-2">Support</p>
+          <Link href="/settings/support" className="flex items-center justify-between py-3 hover:text-pink-500 transition-colors">
+            <div className="flex items-center gap-3">
+              <Headset className="h-5 w-5" />
+              <div>
+                <span className="text-sm font-medium block">Support</span>
+                <span className="text-xs text-muted-foreground">Contact us, privacy policy & terms</span>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
