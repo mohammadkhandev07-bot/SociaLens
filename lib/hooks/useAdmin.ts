@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { ReportWithProfiles, AccountAppeal, ModerationLog, Profile } from '@/lib/types/database.types'
+import { ReportWithProfiles, AccountAppeal, ModerationLog, Profile, ContactSubmission } from '@/lib/types/database.types'
 
 const RESTRICTION_DAYS = 10
 const SUSPENSION_HOURS = 24
@@ -445,6 +445,61 @@ export function useSetVerification() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-account', variables.userId] })
       queryClient.invalidateQueries({ queryKey: ['admin-accounts'] })
+    },
+  })
+}
+
+// ------------------------------------------------------------------
+// Contact Support - submissions from Settings -> Support -> Contact
+// Support (name + message + optional photo/video). Admin-only, same
+// as everything else in the Admin Panel.
+// ------------------------------------------------------------------
+export type ContactSubmissionWithProfile = ContactSubmission & { profiles: any }
+
+export function useContactSubmissions(status: 'pending' | 'resolved') {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: ['admin-contact', status],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contact_submissions')
+        .select('*, profiles(*)')
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as unknown as ContactSubmissionWithProfile[]
+    },
+  })
+}
+
+export function usePendingContactCount() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['admin-contact-count', 'pending'],
+    queryFn: async () => {
+      const { count, error } = await supabase.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      if (error) throw error
+      return count ?? 0
+    },
+  })
+}
+
+export function useResolveContactSubmission() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, resolved }: { id: string; resolved: boolean }) => {
+      const { error } = await supabase
+        .from('contact_submissions')
+        .update({ status: resolved ? 'resolved' : 'pending', reviewed_at: resolved ? new Date().toISOString() : null })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-contact'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-contact-count'] })
     },
   })
 }
