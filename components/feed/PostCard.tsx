@@ -14,6 +14,7 @@ import { RepostBadge } from '@/components/shared/RepostBadge'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { CommentThread } from '@/components/shared/CommentThread'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { formatTimeAgo, formatCount, getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
@@ -33,6 +34,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const [showComments, setShowComments] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const supabase = createClient()
   const queryClient = useQueryClient()
   const articleRef = useRef<HTMLElement>(null)
@@ -145,7 +147,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {isOwner ? (
-                <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(post.id)}>
+                <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)}>
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Post
                 </DropdownMenuItem>
               ) : (
@@ -227,6 +229,18 @@ export function PostCard({ post, onDelete }: PostCardProps) {
           targetType="post"
           targetId={post.id}
           onClose={() => setShowReport(false)}
+        />
+      )}
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete this post?"
+          description="This can't be undone. Your post will be permanently removed."
+          confirmLabel="Delete"
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={() => {
+            setShowDeleteConfirm(false)
+            onDelete?.(post.id)
+          }}
         />
       )}
     </article>
