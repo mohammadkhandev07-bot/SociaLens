@@ -76,6 +76,18 @@ export type AccountAppeal = {
   reviewed_at: string | null
 }
 
+export type ContactSubmission = {
+  id: string
+  user_id: string
+  name: string
+  message: string
+  media_url: string | null
+  media_type: 'image' | 'video' | null
+  status: 'pending' | 'resolved'
+  created_at: string
+  reviewed_at: string | null
+}
+
 export type ModerationLog = {
   id: string
   admin_id: string | null
