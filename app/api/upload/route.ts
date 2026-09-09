@@ -34,4 +34,4 @@ export async function POST(request: NextRequest) {
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path)
   return NextResponse.json({ url: data.publicUrl })
-}
+} 
