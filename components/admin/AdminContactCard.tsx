@@ -35,7 +35,7 @@ export function AdminContactCard({ submission }: { submission: ContactSubmission
         submission.media_type === 'video' ? (
           <video src={submission.media_url} controls className="w-full max-h-64 rounded-xl border bg-black object-contain" />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
+          // Eslint-disable-next-line @next/next/no-img-element
           <img src={submission.media_url} alt="Attachment" className="w-full max-h-64 rounded-xl border object-contain bg-muted" />
         )
       )}
