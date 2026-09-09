@@ -107,12 +107,18 @@ export default function AppealPage() {
     try {
       await verifyPassword.mutateAsync({ email, password })
 
-      const formData = new FormData()
-      formData.append('file', photoFile)
-      formData.append('bucket', 'appeals')
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      const uploadData = await uploadRes.json()
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Could not upload your photo.')
+      // Straight to Supabase Storage from the browser (same reasoning as
+      // Create Post and Chat media) rather than through a server route,
+      // so this never depends on the hosting platform's request-body
+      // size limit for what's otherwise a perfectly normal photo upload.
+      const ext = photoFile.name.split('.').pop() || 'jpg'
+      const path = `${userId}/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('appeals').upload(path, photoFile, {
+        cacheControl: '31536000',
+      })
+      if (uploadError) throw new Error(uploadError.message || 'Could not upload your photo.')
+      const { data: urlData } = supabase.storage.from('appeals').getPublicUrl(path)
+      const uploadData = { url: urlData.publicUrl }
 
       await submitAppeal.mutateAsync({ userId, photoUrl: uploadData.url, letter })
       setStep('submitted')
