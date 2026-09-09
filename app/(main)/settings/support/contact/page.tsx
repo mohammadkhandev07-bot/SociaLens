@@ -6,8 +6,10 @@ import { ChevronLeft, Headset, ImagePlus, Loader2, X, CheckCircle2 } from 'lucid
 import { useUser } from '@/lib/hooks/useUser'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useSubmitContactSupport } from '@/lib/hooks/useContactSupport'
+import { createClient } from '@/lib/supabase/client'
 
 const MAX_MESSAGE_LENGTH = 1000
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
 
 export default function ContactSupportPage() {
   const router = useRouter()
@@ -34,6 +36,11 @@ export default function ContactSupportPage() {
 
   const handleFileSelect = (selected: File | undefined) => {
     if (!selected) return
+    if (selected.size > MAX_FILE_SIZE_BYTES) {
+      setError('That file is too large (50MB max). Please pick a smaller photo or video.')
+      return
+    }
+    setError(null)
     if (preview) URL.revokeObjectURL(preview)
     const isVideo = selected.type.startsWith('video/')
     setFile(selected)
@@ -60,13 +67,20 @@ export default function ContactSupportPage() {
     try {
       let mediaUrl: string | null = null
       if (file) {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('bucket', 'contact-support')
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-        const uploadData = await uploadRes.json()
-        if (!uploadRes.ok) throw new Error(uploadData.error || 'Could not upload your photo/video.')
-        mediaUrl = uploadData.url
+        // Uploaded straight from the browser to Supabase Storage (same as
+        // Create Post's photo/video upload) rather than routed through a
+        // server API endpoint - a server route's request body would get
+        // rejected by the hosting platform's size limit for anything
+        // much bigger than a few MB, which a short video easily is.
+        const supabase = createClient()
+        const ext = file.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('contact-support').upload(path, file, {
+          cacheControl: '31536000',
+        })
+        if (uploadError) throw new Error(uploadError.message || 'Could not upload your photo/video.')
+        const { data: urlData } = supabase.storage.from('contact-support').getPublicUrl(path)
+        mediaUrl = urlData.publicUrl
       }
 
       await submitContact.mutateAsync({
@@ -138,7 +152,7 @@ export default function ContactSupportPage() {
               {mediaType === 'video' ? (
                 <video src={preview} controls className="w-full max-h-56 object-contain bg-black" />
               ) : (
-                // Eslint-disable-next-line @next/next/no-img-element
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt="Attachment preview" className="w-full max-h-56 object-contain bg-muted" />
               )}
               <button
