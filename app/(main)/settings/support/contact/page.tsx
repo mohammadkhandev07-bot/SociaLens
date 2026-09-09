@@ -138,7 +138,7 @@ export default function ContactSupportPage() {
               {mediaType === 'video' ? (
                 <video src={preview} controls className="w-full max-h-56 object-contain bg-black" />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
+                // Eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt="Attachment preview" className="w-full max-h-56 object-contain bg-muted" />
               )}
               <button
