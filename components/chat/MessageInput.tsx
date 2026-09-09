@@ -45,7 +45,7 @@ async function uploadChatMedia(file: File | Blob, filename: string, userId: stri
   // gets rejected by the hosting platform's size limit well before a
   // video or a longer voice message would actually hit this app's own
   // 50MB cap, so going straight to storage is what actually lets a real
-  // video/voice-message get through in production.
+  // Video/voice-message get through in production.
   const supabase = createClient()
   const ext = filename.split('.').pop() || 'bin'
   const path = `${userId}/${Date.now()}.${ext}`
