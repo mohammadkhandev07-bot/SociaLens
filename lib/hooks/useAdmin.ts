@@ -27,7 +27,7 @@ export function useReports(status: ReportStatusFilter) {
 }
 
 // Small helper used by the Reports hub to show a live pending-reports
-// badge without pulling the whole list down.
+// Badge without pulling the whole list down.
 export function usePendingReportsCount() {
   const supabase = createClient()
   return useQuery({
