@@ -17,7 +17,7 @@ export default function SettingsPage() {
 
   // PWA install - lives here (not the landing page) so it only shows up once
   // Someone already has an account and has spent a bit of time in the app,
-  // which is also when the browser is actually willing to fire the native prompt.
+  // Which is also when the browser is actually willing to fire the native prompt.
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [installed, setInstalled] = useState(false)
   const [installing, setInstalling] = useState(false)
