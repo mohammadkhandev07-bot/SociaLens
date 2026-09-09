@@ -207,17 +207,21 @@ export default function ChatRoomPage() {
     if (!user) return
     setSavingWallpaper(true)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('bucket', 'chat-wallpapers')
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      // Straight-to-Supabase-Storage upload (same reasoning as post media
+      // and chat photos/videos) - no server route in the middle to hit a
+      // request-body size ceiling.
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${user.id}/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('chat-wallpapers').upload(path, file, {
+        cacheControl: '31536000',
+      })
+      if (uploadError) throw new Error(uploadError.message || 'Upload failed')
+      const { data: urlData } = supabase.storage.from('chat-wallpapers').getPublicUrl(path)
 
       await setChatWallpaper.mutateAsync({
         chatId,
         userId: user.id,
-        wallpaperUrl: data.url,
+        wallpaperUrl: urlData.publicUrl,
         positionX: Math.round(position.x),
         positionY: Math.round(position.y),
       })
@@ -362,6 +366,7 @@ export default function ChatRoomPage() {
         <MessageInput
           onSend={guardedSendMessage}
           onTyping={sendTypingIndicator}
+          currentUserId={user.id}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
         />
