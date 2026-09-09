@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import {
-  ChevronLeft, ChevronRight, ShieldCheck, FileText, ScrollText, Bell,
+  ChevronLeft, ChevronRight, ShieldCheck, Bell,
   Image as ImageIcon, MessageCircle, Search, Users, Clock, MessageSquare,
   MessagesSquare, Phone,
 } from 'lucide-react'
@@ -49,20 +49,6 @@ export default function PrivacySettingsPage() {
                 <span className="text-sm font-medium block">Notifications</span>
                 <span className="text-xs text-muted-foreground">Choose what you get notified about</span>
               </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </Link>
-          <Link href="/privacy-policy" className="flex items-center justify-between py-3 hover:text-pink-500 transition-colors">
-            <div className="flex items-center gap-3">
-              <FileText className="h-5 w-5" />
-              <span className="text-sm font-medium">Privacy Policy</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </Link>
-          <Link href="/terms" className="flex items-center justify-between py-3 hover:text-pink-500 transition-colors">
-            <div className="flex items-center gap-3">
-              <ScrollText className="h-5 w-5" />
-              <span className="text-sm font-medium">Terms &amp; Conditions</span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
