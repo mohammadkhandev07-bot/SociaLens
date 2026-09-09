@@ -1,14 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, ShieldCheck, Flag, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ShieldCheck, Flag, Users, Headset } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import { usePendingReportsCount } from '@/lib/hooks/useAdmin'
+import { usePendingReportsCount, usePendingContactCount } from '@/lib/hooks/useAdmin'
 
 export default function AdminPanelPage() {
   const { profile, loading } = useUser()
   const { data: pendingCount = 0 } = usePendingReportsCount()
+  const { data: pendingContactCount = 0 } = usePendingContactCount()
 
   if (loading) return <PageLoader />
 
@@ -70,6 +71,29 @@ export default function AdminPanelPage() {
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        </Link>
+
+        <Link
+          href="/settings/admin/contact"
+          className="flex items-center justify-between p-4 hover:bg-accent transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-cyan-500/10 flex items-center justify-center shrink-0">
+              <Headset className="h-5 w-5 text-cyan-500" />
+            </div>
+            <div>
+              <span className="text-sm font-medium block">Contact</span>
+              <span className="text-xs text-muted-foreground">Messages submitted via Contact Support</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {pendingContactCount > 0 && (
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-medium">
+                {pendingContactCount}
+              </span>
+            )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
         </Link>
       </div>
     </div>
