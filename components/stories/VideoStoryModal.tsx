@@ -11,6 +11,7 @@ import { StoryTimeline } from './StoryTimeline'
 import { SceneMenuItem } from './SceneMenu'
 import { useCreateStory, DraftVideoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
+import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 import type { GlobalMusic, StoryVisibility } from '@/lib/types/database.types'
 
 interface VideoStoryModalProps {
@@ -28,14 +29,23 @@ function makeSceneId() {
   return Math.random().toString(36).slice(2, 9)
 }
 
+const MAX_STORY_VIDEO_SECONDS = 5 * 60 // 5 minutes
+
 // Video scenes get their duration from the clip itself, not a manual slider.
-function sceneFromFile(file: File): Promise<EditingScene> {
+// Returns null (instead of a scene) if the clip is longer than SociaLens
+// allows for a single story video, so the caller can show a limit popup.
+function sceneFromFile(file: File): Promise<EditingScene | null> {
   return new Promise((resolve) => {
     const previewUrl = URL.createObjectURL(file)
     const probe = document.createElement('video')
     probe.preload = 'metadata'
     probe.src = previewUrl
     probe.onloadedmetadata = () => {
+      if (probe.duration > MAX_STORY_VIDEO_SECONDS) {
+        URL.revokeObjectURL(previewUrl)
+        resolve(null)
+        return
+      }
       resolve({
         id: makeSceneId(),
         file,
@@ -77,6 +87,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [discardAction, setDiscardAction] = useState<'close' | 'back' | null>(null)
+  const [showVideoLimitPopup, setShowVideoLimitPopup] = useState(false)
 
   const [previewing, setPreviewing] = useState(false)
   const [previewIndex, setPreviewIndex] = useState(0)
@@ -99,8 +110,13 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
   const handleInitialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
+    e.target.value = ''
     if (!f) return
     const s = await sceneFromFile(f)
+    if (!s) {
+      setShowVideoLimitPopup(true)
+      return
+    }
     setScenes([s])
     setActiveSceneId(s.id)
   }
@@ -108,11 +124,15 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
   const handleAddScene = () => addSceneFileRef.current?.click()
   const handleAddSceneFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
+    e.target.value = ''
     if (!f) return
     const s = await sceneFromFile(f)
+    if (!s) {
+      setShowVideoLimitPopup(true)
+      return
+    }
     setScenes((prev) => [...prev, s])
     setActiveSceneId(s.id)
-    e.target.value = ''
   }
 
   const handleDuplicateScene = (id: string) => {
@@ -481,6 +501,14 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
       {showDiscardConfirm && (
         <DiscardConfirmDialog onContinueEditing={() => setShowDiscardConfirm(false)} onDiscard={confirmDiscard} />
+      )}
+
+      {showVideoLimitPopup && (
+        <LimitAlertDialog
+          title="Video is too long"
+          description="You can only upload a video up to 5 minutes long for a story. Please trim it or pick a shorter one."
+          onClose={() => setShowVideoLimitPopup(false)}
+        />
       )}
 
       {showAudiencePicker && (
