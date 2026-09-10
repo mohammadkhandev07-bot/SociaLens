@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 // A public, no-login-required page for a single shared Aperonix reply.
 // Aperonix conversations aren't stored anywhere normally, so sharing one
 // outside the app first saves just that reply's text into its own public
-// row (see the Share button in the Aperonix chat) - this page just reads
+// Row (see the Share button in the Aperonix chat) - this page just reads
 // that row back by id.
 export default function PublicAperonixReplyPage() {
   const params = useParams<{ id: string }>()
