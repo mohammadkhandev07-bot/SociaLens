@@ -57,4 +57,4 @@ export default function PrivacySettingsPage() {
       </Card>
     </div>
   )
-}
+} 
