@@ -88,7 +88,7 @@ export function FollowersModal({ profileId, type, onClose }: FollowersModalProps
         className="bg-card border rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="font-bold text-base">
             {type === 'followers' ? 'Followers' : 'Following'}
