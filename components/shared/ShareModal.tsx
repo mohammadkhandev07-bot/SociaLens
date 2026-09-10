@@ -8,6 +8,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
 
 interface ShareModalProps {
   post: PostWithProfile
@@ -116,6 +117,17 @@ export function ShareModal({ post, onClose }: ShareModalProps) {
     (p.full_name || '').toLowerCase().includes(search.toLowerCase())
   )
 
+  const isVideo = post.media_type === 'video'
+
+  const getExternalShareUrl = async () => {
+    // Record this as a real share too (same counter the internal-share
+    // path already updates), just with no destination chat.
+    if (user) {
+      await supabase.from('shares').insert({ post_id: post.id, shared_by_id: user.id, shared_to_chat_id: null })
+    }
+    return `${window.location.origin}/share/post/${post.id}`
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center p-4"
       onClick={onClose}>
@@ -138,6 +150,14 @@ export function ShareModal({ post, onClose }: ShareModalProps) {
             <p className="text-xs text-muted-foreground truncate">{post.content?.slice(0, 50) || 'Post'}</p>
           </div>
         </div>
+
+        <ExternalShareBar
+          getShareUrl={getExternalShareUrl}
+          shareTitle="SociaLens"
+          shareText={`Check out this ${isVideo ? 'reel' : 'post'} by @${post.profiles?.username} on SociaLens`}
+        />
+
+        <p className="px-4 pt-2 text-[11px] text-muted-foreground text-center">Or send directly to someone on SociaLens</p>
 
         <div className="px-4 py-2 border-b">
           <div className="relative">
