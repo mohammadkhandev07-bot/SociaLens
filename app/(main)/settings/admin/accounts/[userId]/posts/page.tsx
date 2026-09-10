@@ -43,7 +43,7 @@ export default function AdminAccountPostsPage() {
           {posts.map(post => (
             <div key={post.id} className="relative aspect-square bg-muted rounded-md overflow-hidden group">
               {post.media_url && post.media_type === 'image' && (
-                // eslint-disable-next-line @next/next/no-img-element
+                // Eslint-disable-next-line @next/next/no-img-element
                 <img src={post.media_url} alt="" className="w-full h-full object-cover" />
               )}
               {post.media_url && post.media_type === 'video' && (
