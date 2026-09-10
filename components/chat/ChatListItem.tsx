@@ -25,7 +25,7 @@ interface ChatListItemProps {
   isArchived: boolean
   /** Whether *I* have blocked this person - the list already excludes
    *  chats where they've blocked me, so this only ever needs to reflect
-   *  my own side. */
+   *  My own side. */
   iBlockedThem: boolean
   /** When set, replaces the default in-place archive toggle - e.g. to run
    *  the first-time password wizard before actually archiving. */
