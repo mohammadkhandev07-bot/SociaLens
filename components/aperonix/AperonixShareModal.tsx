@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
 
 interface AperonixShareModalProps {
   replyText: string
@@ -101,6 +102,17 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
     (p.full_name || '').toLowerCase().includes(search.toLowerCase())
   )
 
+  const getExternalShareUrl = async () => {
+    if (!user) throw new Error('Not signed in')
+    const { data, error } = await supabase
+      .from('shared_aperonix_replies')
+      .insert({ shared_by: user.id, content: replyText })
+      .select('id')
+      .single()
+    if (error || !data) throw error || new Error('Could not create link')
+    return `${window.location.origin}/share/aperonix/${data.id}`
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 z-[110] flex items-end sm:items-center justify-center p-4"
       onClick={onClose}>
@@ -120,6 +132,14 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
             <p className="text-xs text-muted-foreground truncate">{replyText.slice(0, 60)}</p>
           </div>
         </div>
+
+        <ExternalShareBar
+          getShareUrl={getExternalShareUrl}
+          shareTitle="Aperonix - SociaLens"
+          shareText="Check out this reply from Aperonix on SociaLens"
+        />
+
+        <p className="px-4 pt-2 text-[11px] text-muted-foreground text-center">Or send directly to someone on SociaLens</p>
 
         <div className="px-4 py-2 border-b">
           <div className="relative">
