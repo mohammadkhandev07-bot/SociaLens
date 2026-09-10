@@ -6,7 +6,7 @@ import { ChevronLeft, PlayCircle, Heart, MessageCircle } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useAdminAccount, useAdminAccountPosts } from '@/lib/hooks/useAdminAccounts'
-import { formatCount } from '@/lib/utils/helpers'
+import { formatCount, getPostPreviewText } from '@/lib/utils/helpers'
 
 export default function AdminAccountPostsPage() {
   const params = useParams()
@@ -54,7 +54,7 @@ export default function AdminAccountPostsPage() {
               )}
               {!post.media_url && (
                 <div className="w-full h-full flex items-center justify-center p-2">
-                  <p className="text-[10px] text-center line-clamp-5">{post.content}</p>
+                  <p className="text-[10px] text-center line-clamp-5">{getPostPreviewText(post.content)}</p>
                 </div>
               )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
@@ -71,4 +71,4 @@ export default function AdminAccountPostsPage() {
       )}
     </div>
   )
-} 
+}
