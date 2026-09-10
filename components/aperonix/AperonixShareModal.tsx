@@ -23,7 +23,7 @@ interface Person {
   verification_type?: 'blue' | 'yellow' | null
 }
 
-// Same followers+following picker as the post ShareModal, Reused here so an.
+// Same followers+following picker as the post ShareModal, reused here so an.
 // Aperonix reply can be forwarded to one or more people in chat.
 export function AperonixShareModal({ replyText, onClose }: AperonixShareModalProps) {
   const { user } = useUser()
