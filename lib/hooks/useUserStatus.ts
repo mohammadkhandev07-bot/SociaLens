@@ -27,7 +27,7 @@ export function useUserStatus(targetUserId: string | undefined | null, chatId?: 
 
   // If a chatId is given, additionally watch that specific conversation's
   // presence channel for "is the target currently on this chat page" -
-  // that's what upgrades the dot from blue (Active) to green (Online).
+  // That's what upgrades the dot from blue (Active) to green (Online).
   useEffect(() => {
     if (!chatId || !targetUserId) { setOnlineInChat(false); return }
     const supabase = createClient()
