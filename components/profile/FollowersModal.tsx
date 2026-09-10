@@ -5,6 +5,8 @@ import { X, Users } from 'lucide-react'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { StatusDot } from '@/components/shared/StatusDot'
+import { useUserStatus } from '@/lib/hooks/useUserStatus'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { Profile } from '@/lib/types/database.types'
@@ -14,6 +16,39 @@ interface FollowersModalProps {
   profileId: string
   type: 'followers' | 'following'
   onClose: () => void
+}
+
+function PersonRow({ person, onClose }: { person: Profile; onClose: () => void }) {
+  const status = useUserStatus(person.id)
+  return (
+    <Link
+      href={`/profile/${person.username}`}
+      onClick={onClose}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
+    >
+      <div className="relative shrink-0">
+        <Avatar className="h-11 w-11">
+          <AvatarImage
+            src={getAvatarUrl(person.avatar_url)}
+            alt={person.username}
+          />
+          <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 text-white font-semibold">
+            {person.username?.[0]?.toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <StatusDot status={status} className="absolute bottom-0 right-0" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm truncate">{person.username}</p>
+        {person.full_name && (
+          <p className="text-xs text-muted-foreground truncate">{person.full_name}</p>
+        )}
+      </div>
+      {person.is_verified && (
+        <VerifiedBadge type={person.verification_type} className="text-sm shrink-0" />
+      )}
+    </Link>
+  )
 }
 
 export function FollowersModal({ profileId, type, onClose }: FollowersModalProps) {
@@ -86,31 +121,7 @@ export function FollowersModal({ profileId, type, onClose }: FollowersModalProps
             </div>
           ) : (
             people.map(person => (
-              <Link
-                key={person.id}
-                href={`/profile/${person.username}`}
-                onClick={onClose}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
-              >
-                <Avatar className="h-11 w-11 shrink-0">
-                  <AvatarImage
-                    src={getAvatarUrl(person.avatar_url)}
-                    alt={person.username}
-                  />
-                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 text-white font-semibold">
-                    {person.username?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{person.username}</p>
-                  {person.full_name && (
-                    <p className="text-xs text-muted-foreground truncate">{person.full_name}</p>
-                  )}
-                </div>
-                {person.is_verified && (
-                  <VerifiedBadge type={person.verification_type} className="text-sm shrink-0" />
-                )}
-              </Link>
+              <PersonRow key={person.id} person={person} onClose={onClose} />
             ))
           )}
         </div>
