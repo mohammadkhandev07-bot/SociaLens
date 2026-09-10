@@ -12,6 +12,7 @@ import { getAvatarUrl } from '@/lib/utils/helpers'
 import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
+import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface CreatePostModalProps {
@@ -23,6 +24,7 @@ interface CreatePostModalProps {
 // Than this is turned away up front with a friendly message instead of
 // Attempting the request and failing with a confusing technical error.
 const MAX_AI_MEDIA_BYTES = 3.5 * 1024 * 1024 // ~3.5MB raw file (safely under Vercel's ~4.5MB request limit once base64-encoded)
+const MAX_POST_VIDEO_SECONDS = 20 * 60 // 20 minutes
 
 // Curated SociaLens hashtag suggestions - shown as autocomplete while typing
 const SUGGESTED_HASHTAGS = [
@@ -91,10 +93,31 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
   const [generateError, setGenerateError] = useState('')
   const [aiContext, setAiContext] = useState('')
   const [showRestrictionPopup, setShowRestrictionPopup] = useState(false)
+  const [showVideoLimitPopup, setShowVideoLimitPopup] = useState(false)
+  const [checkingVideo, setCheckingVideo] = useState(false)
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
+
+    if (file.type.startsWith('video')) {
+      setCheckingVideo(true)
+      const duration = await new Promise<number>((resolve) => {
+        const video = document.createElement('video')
+        const url = URL.createObjectURL(file)
+        video.preload = 'metadata'
+        video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration) }
+        video.onerror = () => { URL.revokeObjectURL(url); resolve(0) }
+        video.src = url
+      })
+      setCheckingVideo(false)
+      if (duration > MAX_POST_VIDEO_SECONDS) {
+        setShowVideoLimitPopup(true)
+        return
+      }
+    }
+
     setMediaFile(file)
     setMediaType(file.type.startsWith('video') ? 'video' : 'image')
     setMediaPreview(URL.createObjectURL(file))
@@ -283,6 +306,13 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
       {showRestrictionPopup && (
         <RestrictionPopup feature="posting" until={profile?.restrict_post_until} onClose={() => setShowRestrictionPopup(false)} />
       )}
+      {showVideoLimitPopup && (
+        <LimitAlertDialog
+          title="Video is too long"
+          description="You can only upload a video up to 20 minutes long for a post. Please trim it or pick a shorter one."
+          onClose={() => setShowVideoLimitPopup(false)}
+        />
+      )}
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={onClose}>
       <div className="bg-card border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl"
@@ -347,6 +377,11 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
                 </div>
               </button>
             </div>
+            {checkingVideo && (
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking video length...
+              </p>
+            )}
           </div>
         )}
 
