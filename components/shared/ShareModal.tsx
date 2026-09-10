@@ -5,7 +5,7 @@ import { X, Send, Search, Check } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
-import { getAvatarUrl } from '@/lib/utils/helpers'
+import { getAvatarUrl, getPostPreviewText } from '@/lib/utils/helpers'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
@@ -147,7 +147,7 @@ export function ShareModal({ post, onClose }: ShareModalProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold">@{post.profiles?.username}</p>
-            <p className="text-xs text-muted-foreground truncate">{post.content?.slice(0, 50) || 'Post'}</p>
+            <p className="text-xs text-muted-foreground truncate">{getPostPreviewText(post.content).slice(0, 50) || 'Post'}</p>
           </div>
         </div>
 
