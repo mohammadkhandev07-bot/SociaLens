@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (!result) throw new Error('Empty response')
     // Belt-and-suspenders - even though the prompt already asks for plain
     // text, models occasionally slip in a stray ** anyway, and that would
-    // show up literally in the post instead of actually rendering bold.
+    // Show up literally in the post instead of actually rendering bold.
     result = stripMarkdown(result)
 
     return NextResponse.json({ result })
