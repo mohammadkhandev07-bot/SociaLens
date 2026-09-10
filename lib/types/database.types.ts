@@ -76,6 +76,13 @@ export type AccountAppeal = {
   reviewed_at: string | null
 }
 
+export type SharedAperonixReply = {
+  id: string
+  shared_by: string | null
+  content: string
+  created_at: string
+}
+
 export type ContactSubmission = {
   id: string
   user_id: string
