@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ShieldCheck, Bell,
   Image as ImageIcon, MessageCircle, Search, Users, Clock, MessageSquare,
-  MessagesSquare, Phone,
+  MessagesSquare, Phone, Circle,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -16,6 +16,7 @@ const PRIVACY_LINKS = [
   { href: '/settings/privacy/post-comments', icon: MessageSquare, title: 'Post Comment Privacy', desc: 'Who can see comments on your posts' },
   { href: '/settings/privacy/story-comments', icon: MessagesSquare, title: 'Story Comment Privacy', desc: 'Who can see comments on your story' },
   { href: '/settings/privacy/calls', icon: Phone, title: 'Call Privacy', desc: "Who can call you" },
+  { href: '/settings/privacy/status', icon: Circle, title: 'Status Privacy', desc: 'Who can see when you\'re Active or Online' },
 ]
 
 export default function PrivacySettingsPage() {
