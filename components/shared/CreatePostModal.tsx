@@ -20,7 +20,7 @@ interface CreatePostModalProps {
 }
 
 // Media gets sent to Aperonix as inline data, which keeps things simple but
-// Is limited by the server's request size limit - so anything much bigger
+// Is limited by the server's request size limit - So anything much bigger
 // Than this is turned away up front with a friendly message instead of
 // Attempting the request and failing with a confusing technical error.
 const MAX_AI_MEDIA_BYTES = 3.5 * 1024 * 1024 // ~3.5MB raw file (safely under Vercel's ~4.5MB request limit once base64-encoded)
