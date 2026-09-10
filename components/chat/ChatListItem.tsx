@@ -10,6 +10,8 @@ import { getClampedPopupPosition } from '@/lib/utils/popupPosition'
 import { useTogglePinChat, useToggleArchiveChat, useDeleteChatForMe, useToggleBlock } from '@/lib/hooks/useChatSettings'
 import type { Chat } from '@/lib/types/database.types'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { StatusDot } from '@/components/shared/StatusDot'
+import { useUserStatus } from '@/lib/hooks/useUserStatus'
 
 const MENU_WIDTH = 200
 const MENU_HEIGHT = 200
@@ -40,6 +42,7 @@ export function ChatListItem({ chat, other, currentUserId, unread, isPinned, isA
   const toggleArchive = useToggleArchiveChat()
   const deleteChat = useDeleteChatForMe()
   const toggleBlock = useToggleBlock()
+  const status = useUserStatus(other?.id, chat.id)
 
   const openMenu = () => {
     const rect = menuBtnRef.current?.getBoundingClientRect()
@@ -84,6 +87,7 @@ export function ChatListItem({ chat, other, currentUserId, unread, isPinned, isA
             <AvatarImage src={getAvatarUrl(other.avatar_url)} />
             <AvatarFallback>{other.username?.[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
+          <StatusDot status={status} className="absolute bottom-0 right-0" />
           {unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
               {unread > 9 ? '9+' : unread}
