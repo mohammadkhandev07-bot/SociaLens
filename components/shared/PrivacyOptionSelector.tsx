@@ -11,7 +11,7 @@ import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 export type PrivacyLevel = 'everyone' | 'followers' | 'following' | 'selected' | 'none'
 export type PrivacyCategory =
   | 'post' | 'message' | 'search' | 'notify_message' | 'notify_post'
-  | 'suggestions' | 'story' | 'post_comment' | 'story_comment' | 'call'
+  | 'suggestions' | 'story' | 'post_comment' | 'story_comment' | 'call' | 'status'
 
 const LEVEL_OPTIONS: { value: PrivacyLevel; label: string; hint: string }[] = [
   { value: 'everyone', label: 'Everyone', hint: 'Anyone on SociaLens' },
@@ -188,4 +188,4 @@ export function PrivacyOptionSelector({
       )}
     </Card>
   )
-}  
+}
