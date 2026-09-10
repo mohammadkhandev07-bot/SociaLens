@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Circle, Settings, Phone, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { StatusDot } from '@/components/shared/StatusDot'
 import { RealtimeMessages } from '@/components/chat/RealtimeMessages'
 import { MessageInput } from '@/components/chat/MessageInput'
 import { NicknameModal } from '@/components/chat/NicknameModal'
@@ -19,6 +20,8 @@ import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
 import { useCallContext } from '@/components/call/CallProvider'
 import { StoryViewer } from '@/components/stories/StoryViewer'
 import { createClient } from '@/lib/supabase/client'
+import { usePresence } from '@/lib/contexts/PresenceContext'
+import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 import { ChatWithProfiles, Message } from '@/lib/types/database.types'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
@@ -58,6 +61,19 @@ export default function ChatRoomPage() {
   }
 
   const other = chat && user ? (chat.participant1_id === user.id ? chat.participant2 : chat.participant1) : null
+
+  const { activeUserIds } = usePresence()
+  const [statusAllowed, setStatusAllowed] = useState(true)
+  useEffect(() => {
+    if (!user || !other) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.from('profiles').select('status_privacy').eq('id', other.id).maybeSingle()
+      const ok = await canAccessByPrivacy(supabase, user.id, other.id, (data as any)?.status_privacy, 'status')
+      if (!cancelled) setStatusAllowed(ok)
+    })()
+    return () => { cancelled = true }
+  }, [other?.id, user?.id])
 
   const { data: myNicknameForThem } = useNickname(chatId, user?.id)
   const setNickname = useSetNickname()
@@ -265,7 +281,9 @@ export default function ChatRoomPage() {
     return <PageLoader />
   }
 
-  const isOnline = onlineUsers.includes(other.id)
+  const isOnlineInThisChat = onlineUsers.includes(other.id)
+  const isActiveGlobally = activeUserIds.has(other.id)
+  const presenceStatus: 'online' | 'active' | null = !statusAllowed ? null : isOnlineInThisChat ? 'online' : isActiveGlobally ? 'active' : null
   const otherStoryGroupIndex = storyGroups.findIndex(g => g.userId === other.id)
   const hasStory = otherStoryGroupIndex !== -1 && !theyBlockedMe
 
@@ -298,11 +316,12 @@ export default function ChatRoomPage() {
           disabled={theyBlockedMe}
         >
           <div className={hasStory ? 'p-[2px] rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600' : ''}>
-            <div className={hasStory ? 'p-[2px] rounded-full bg-background' : ''}>
+            <div className={`relative ${hasStory ? 'p-[2px] rounded-full bg-background' : ''}`}>
               <Avatar className="h-9 w-9">
                 <AvatarImage src={displayAvatar || undefined} />
                 <AvatarFallback>{displayName?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
+              {!theyBlockedMe && <StatusDot status={presenceStatus} size="sm" className="absolute bottom-0 right-0" />}
             </div>
           </div>
         </button>
@@ -317,8 +336,12 @@ export default function ChatRoomPage() {
           </button>
           {!theyBlockedMe && (
             <div className="flex items-center gap-1">
-              <Circle className={`h-2 w-2 fill-current ${isOnline ? 'text-green-500' : 'text-muted-foreground'}`} />
-              <span className="text-xs text-muted-foreground">{isOnline ? 'Online' : 'Offline'}</span>
+              <Circle className={`h-2 w-2 fill-current ${
+                presenceStatus === 'online' ? 'text-green-500' : presenceStatus === 'active' ? 'text-blue-500' : 'text-muted-foreground'
+              }`} />
+              <span className="text-xs text-muted-foreground">
+                {presenceStatus === 'online' ? 'Online' : presenceStatus === 'active' ? 'Active' : 'Offline'}
+              </span>
             </div>
           )}
         </div>
