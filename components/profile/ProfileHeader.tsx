@@ -13,6 +13,8 @@ import { formatCount, getAvatarUrl } from '@/lib/utils/helpers'
 import { useStartChat } from '@/lib/hooks/useStartChat'
 import { useBlockStatus, useToggleBlock } from '@/lib/hooks/useChatSettings'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { StatusDot } from '@/components/shared/StatusDot'
+import { useUserStatus } from '@/lib/hooks/useUserStatus'
 import Link from 'next/link'
 
 interface ProfileHeaderProps {
@@ -28,6 +30,7 @@ export function ProfileHeader({ profile, currentUserId }: ProfileHeaderProps) {
   const { startChat, startingChatWith, error: chatError } = useStartChat()
   const { data: blockStatus } = useBlockStatus(currentUserId, profile.id)
   const toggleBlock = useToggleBlock()
+  const status = useUserStatus(isOwn ? null : profile.id)
 
   return (
     <div>
@@ -41,12 +44,15 @@ export function ProfileHeader({ profile, currentUserId }: ProfileHeaderProps) {
       {/* Profile Info */}
       <div className="px-4 pb-4">
         <div className="flex items-end justify-between -mt-12 mb-3">
-          <Avatar className="h-24 w-24 border-4 border-background">
-            <AvatarImage src={getAvatarUrl(profile.avatar_url)} />
-            <AvatarFallback className="text-2xl">
-              {profile.username?.[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-24 w-24 border-4 border-background">
+              <AvatarImage src={getAvatarUrl(profile.avatar_url)} />
+              <AvatarFallback className="text-2xl">
+                {profile.username?.[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <StatusDot status={status} size="lg" className="absolute bottom-1 right-1" />
+          </div>
 
           <div className="flex gap-2 mt-4">
             {isOwn ? (
@@ -180,4 +186,4 @@ export function ProfileHeader({ profile, currentUserId }: ProfileHeaderProps) {
       )}
     </div>
   )
-} 
+}
