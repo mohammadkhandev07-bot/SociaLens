@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { FullEmojiPicker } from './FullEmojiPicker'
 import { StickerPicker } from './StickerPicker'
 import { getClampedPopupPosition } from '@/lib/utils/popupPosition'
+import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 
 export interface SendPayload {
   content?: string
@@ -26,7 +27,14 @@ interface MessageInputProps {
   onCancelReply?: () => void
 }
 
-const MAX_VIDEO_SECONDS = 30 * 60 // 30 minutes
+const MAX_VIDEO_SECONDS = 60 * 60 // 60 minutes
+const MAX_MESSAGE_WORDS = 10000
+
+function countWords(text: string): number {
+  const trimmed = text.trim()
+  if (!trimmed) return 0
+  return trimmed.split(/\s+/).length
+}
 
 function getVideoDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -45,7 +53,7 @@ async function uploadChatMedia(file: File | Blob, filename: string, userId: stri
   // gets rejected by the hosting platform's size limit well before a
   // video or a longer voice message would actually hit this app's own
   // 50MB cap, so going straight to storage is what actually lets a real
-  // Video/voice-message get through in production.
+  // video/voice-message get through in production.
   const supabase = createClient()
   const ext = filename.split('.').pop() || 'bin'
   const path = `${userId}/${Date.now()}.${ext}`
@@ -70,6 +78,7 @@ export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyi
   const [attachedType, setAttachedType] = useState<'image' | 'video' | null>(null)
   const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null)
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [limitPopup, setLimitPopup] = useState<{ title: string; description: string } | null>(null)
   const [checkingVideo, setCheckingVideo] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -142,7 +151,10 @@ export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyi
     try {
       const duration = await getVideoDuration(file)
       if (duration > MAX_VIDEO_SECONDS) {
-        setAttachError(`This video is too long (max 30 minutes).`)
+        setLimitPopup({
+          title: 'Video is too long',
+          description: 'You can only send a video up to 60 minutes long in chat. Please trim it or pick a shorter one.',
+        })
         setCheckingVideo(false)
         return
       }
@@ -214,6 +226,14 @@ export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyi
     if (disabled || sending) return
     const text = message.trim()
     if (!text && !attachedFile) return
+
+    if (countWords(text) > MAX_MESSAGE_WORDS) {
+      setLimitPopup({
+        title: 'Message is too long',
+        description: `You can only send up to ${MAX_MESSAGE_WORDS.toLocaleString()} words in a single message. Please shorten it or split it into more than one message.`,
+      })
+      return
+    }
 
     if (attachedFile) {
       setSending(true)
@@ -387,6 +407,13 @@ export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyi
           <div className="fixed inset-0 z-30" onClick={() => setShowStickers(false)} />
           <StickerPicker onSelect={handleStickerSelect} onClose={() => setShowStickers(false)} style={{ top: stickerPos.top, left: stickerPos.left }} />
         </>
+      )}
+      {limitPopup && (
+        <LimitAlertDialog
+          title={limitPopup.title}
+          description={limitPopup.description}
+          onClose={() => setLimitPopup(null)}
+        />
       )}
     </div>
   )
