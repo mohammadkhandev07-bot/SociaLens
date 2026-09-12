@@ -25,7 +25,7 @@ const REASONS: { value: string; label: string }[] = [
 ]
 
 // One modal, reused everywhere something can be reported - which table
-// column the target id goes into is decided from `targetType`.
+// Column the target id goes into is decided from `targetType`.
 export function ReportModal({ reporterId, reportedUserId, targetType, targetId, onClose }: ReportModalProps) {
   const supabase = createClient()
   const track = useTrackEvent()
