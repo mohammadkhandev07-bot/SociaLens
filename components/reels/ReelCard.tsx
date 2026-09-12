@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Volume2, VolumeX, Share2, X, Repeat2, MoreVertical, Flag } from 'lucide-react'
+import { Heart, MessageCircle, Volume2, VolumeX, Share2, X, Repeat2, MoreVertical, Flag, EyeOff, Check } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { PostCaption } from '@/components/shared/PostCaption'
@@ -16,6 +16,7 @@ import { formatCount, getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 
 interface ReelCardProps {
   post: PostWithProfile
@@ -34,14 +35,29 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [markedNotInterested, setMarkedNotInterested] = useState(false)
   const [progress, setProgress] = useState(0) // 0-100
   const [seeking, setSeeking] = useState(false)
   const hasCountedViewRef = useRef(false)
   const { user, profile } = useUser()
   const supabase = createClient()
+  const track = useTrackEvent()
+  const watchedSecondsRef = useRef(0)
+  const watchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const loopCountRef = useRef(0)
+  const hasTrackedCompletionRef = useRef(false)
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id)
   const toggleRepost = useToggleRepost()
+
+  const flushWatchTime = () => {
+    if (watchIntervalRef.current) { clearInterval(watchIntervalRef.current); watchIntervalRef.current = null }
+    const seconds = watchedSecondsRef.current
+    watchedSecondsRef.current = 0
+    if (seconds > 0.5) {
+      track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'watch_time', watch_seconds: seconds, video_duration: videoRef.current?.duration })
+    }
+  }
 
   useEffect(() => {
     if (!videoRef.current) return
@@ -59,7 +75,17 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
       setPaused(false)
       if (!hasCountedViewRef.current) {
         hasCountedViewRef.current = true
-        supabase.rpc('increment_post_views', { post_id: post.id }).then(() => {})
+        track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'view' })
+      }
+      // Counts actual seconds spent watching (not wall-clock time the
+      // card merely sat in the DOM) - flushed as one watch_time event
+      // once this reel stops being the active one.
+      loopCountRef.current = 0
+      hasTrackedCompletionRef.current = false
+      if (!watchIntervalRef.current) {
+        watchIntervalRef.current = setInterval(() => {
+          if (videoRef.current && !videoRef.current.paused) watchedSecondsRef.current += 1
+        }, 1000)
       }
     } else {
       videoRef.current.pause()
@@ -69,7 +95,9 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
       videoRef.current.currentTime = 0
       setProgress(0)
       hasCountedViewRef.current = false
+      flushWatchTime()
     }
+    return () => flushWatchTime()
   }, [isActive, showComments, showShare, post.id])
 
   useEffect(() => {
@@ -92,7 +120,20 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
   const handleTimeUpdate = () => {
     const v = videoRef.current
     if (!v || !v.duration || seeking) return
-    setProgress((v.currentTime / v.duration) * 100)
+    const pct = (v.currentTime / v.duration) * 100
+    // loop="true" seeks back to 0 and keeps playing without ever firing a
+    // real 'ended' event, so a rewatch/loop shows up here instead - the
+    // progress bar snapping from near the end back to near zero.
+    if (progress > 90 && pct < 10) {
+      if (!hasTrackedCompletionRef.current) {
+        hasTrackedCompletionRef.current = true
+        track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'completion' })
+      } else {
+        loopCountRef.current += 1
+        track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'rewatch' })
+      }
+    }
+    setProgress(pct)
   }
 
   const seekFromClientX = (clientX: number) => {
@@ -128,6 +169,7 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
     if (newLiked) {
       await supabase.from('likes').insert({ post_id: post.id, user_id: user.id })
       await supabase.rpc('increment_likes', { post_id: post.id })
+      track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'like' })
       if (user.id !== post.user_id) {
         await supabase.from('notifications').insert({
           user_id: post.user_id, actor_id: user.id, type: 'like', post_id: post.id,
@@ -249,7 +291,23 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-full bottom-0 mr-2 z-40 bg-card border rounded-xl shadow-xl overflow-hidden w-40">
+                <div className="absolute right-full bottom-0 mr-2 z-40 bg-card border rounded-xl shadow-xl overflow-hidden w-48">
+                  {markedNotInterested ? (
+                    <div className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-muted-foreground">
+                      <Check className="h-3.5 w-3.5" /> We'll show fewer like this
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        setMarkedNotInterested(true)
+                        track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'not_interested' })
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-accent"
+                    >
+                      <EyeOff className="h-3.5 w-3.5" /> Not Interested
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowMenu(false); setShowReport(true) }}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10"
