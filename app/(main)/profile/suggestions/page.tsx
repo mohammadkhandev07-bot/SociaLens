@@ -71,7 +71,36 @@ export default function SuggestionsPage() {
         }
       })
 
-      return visible.slice(0, 30)
+      if (visible.length === 0) return []
+
+      // Rank by mutual connections + past interaction/creator-similarity
+      // signal, not just "who joined most recently" - the same mix
+      // Instagram's "Suggested for you" uses (people your friends follow,
+      // people whose content you already seem to like).
+      const visibleIds = visible.map(p => p.id)
+      const { data: iFollowRows } = await supabase.from('follows').select('following_id').eq('follower_id', user.id).eq('status', 'accepted')
+      const myFollowingIds = (iFollowRows || []).map((r: any) => r.following_id)
+
+      const [{ data: mutualRows }, { data: affinityRows }] = await Promise.all([
+        myFollowingIds.length > 0
+          ? supabase.from('follows').select('follower_id, following_id').eq('status', 'accepted').in('follower_id', myFollowingIds).in('following_id', visibleIds)
+          : Promise.resolve({ data: [] as any[] }),
+        supabase.from('user_creator_affinity').select('creator_id, score').eq('user_id', user.id).in('creator_id', visibleIds),
+      ])
+      const mutualCount = new Map<string, number>()
+      for (const r of (mutualRows || []) as any[]) {
+        mutualCount.set(r.following_id, (mutualCount.get(r.following_id) || 0) + 1)
+      }
+      const affinity = new Map((affinityRows || []).map((r: any) => [r.creator_id, r.score]))
+
+      const ranked = [...visible].sort((a, b) => {
+        const scoreA = (mutualCount.get(a.id) || 0) * 3 + Math.tanh((affinity.get(a.id) || 0) / 5) * 2
+        const scoreB = (mutualCount.get(b.id) || 0) * 3 + Math.tanh((affinity.get(b.id) || 0) / 5) * 2
+        if (scoreB !== scoreA) return scoreB - scoreA
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+
+      return ranked.slice(0, 30)
     },
     enabled: !!user,
   })
