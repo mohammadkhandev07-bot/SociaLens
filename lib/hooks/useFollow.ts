@@ -51,7 +51,7 @@ export function useFollowUser() {
         // database trigger on the follows table now (see
         // supabase-migration-follow-counts-fix.sql) - it recalculates the
         // real count every time a row here changes, so there's nothing to
-        // increment by hand. Calling an RPC here too would double-count.
+        // Increment by hand. Calling an RPC here too would double-count.
         await supabase.from('notifications').insert({
           user_id: followingId,
           actor_id: followerId,
