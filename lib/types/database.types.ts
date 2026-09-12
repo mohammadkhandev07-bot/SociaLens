@@ -117,6 +117,15 @@ export type Post = {
   comments_count: number
   shares_count: number
   views_count: number
+  total_watch_seconds?: number
+  watch_sessions?: number
+  completion_count?: number
+  rewatch_count?: number
+  skip_count?: number
+  not_interested_count?: number
+  report_count?: number
+  quality_score?: number
+  last_engaged_at?: string | null
   created_at: string
   updated_at: string
 }
