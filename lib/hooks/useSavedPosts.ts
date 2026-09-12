@@ -3,8 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 
-// Defined locally (instead of imported from database.types.ts) so this file
-// builds correctly on its own regardless of whether that file was updated.
 export type SavedFolder = {
   id: string
   user_id: string
@@ -21,8 +19,8 @@ export type SavedPost = {
 }
 
 export const MAX_SAVED_FOLDERS = 10
+const SAVED_POST_SELECT = '*, posts(*, profiles!posts_user_id_fkey(*))'
 
-// All of a user's folders, oldest first (so the default "first" folder stays stable).
 export function useSavedFolders(userId?: string) {
   const supabase = createClient()
 
@@ -66,8 +64,6 @@ export function useCreateFolder() {
   })
 }
 
-// Set of post ids the current user has saved (in any folder) - used to show
-// the filled/unfilled bookmark icon everywhere a post appears.
 export function useSavedPostIds(userId?: string) {
   const supabase = createClient()
 
@@ -123,7 +119,6 @@ export function useUnsavePost() {
   })
 }
 
-// All saved posts (with their post data) inside a specific folder.
 export function useSavedPostsInFolder(folderId?: string) {
   const supabase = createClient()
 
@@ -132,7 +127,7 @@ export function useSavedPostsInFolder(folderId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('saved_posts')
-        .select('*, posts(*, profiles(*))')
+        .select(SAVED_POST_SELECT)
         .eq('folder_id', folderId as string)
         .order('created_at', { ascending: false })
       if (error) throw error
