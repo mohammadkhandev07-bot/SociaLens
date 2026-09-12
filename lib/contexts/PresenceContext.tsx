@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
+import { useEventFlusher } from '@/lib/hooks/useTrackEvent'
 
 interface PresenceContextValue {
   // Everyone currently known to have SociaLens open, on any page - the
@@ -24,6 +25,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser()
   const [activeUserIds, setActiveUserIds] = useState<Set<string>>(new Set())
   const supabaseRef = useRef(createClient())
+  useEventFlusher()
 
   useEffect(() => {
     if (!user) return
