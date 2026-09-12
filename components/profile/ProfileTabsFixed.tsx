@@ -52,8 +52,13 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
           .limit(PAGE_SIZE),
       ])
 
+      // Own posts are the primary content here - a real problem fetching
+      // those should surface as an error. The reposts side-query is
+      // supplementary (it only adds the "reposted" badge posts to the
+      // grid), so a hiccup there should never hide the person's actual
+      // own posts/reels - it just quietly contributes nothing this time.
       if (ownError) throw ownError
-      if (repostError) throw repostError
+      if (repostError) console.error('profile reposts fetch failed, showing own posts only', repostError)
 
       const repostedPosts: PostWithProfile[] = (reposts ?? [])
         .filter((r: any) => r.posts)
