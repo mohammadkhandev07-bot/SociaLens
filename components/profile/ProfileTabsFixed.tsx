@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { Film, Grid3x3, Lock, Play, Repeat2, Trash2 } from 'lucide-react'
+import { Film, Grid3x3, Lock, Play, Repeat2 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/client'
@@ -109,7 +109,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
           <TabsTrigger value="posts" className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground">
             <Grid3x3 className="h-4 w-4" /> Posts
           </TabsTrigger>
-          <TabsTrigger value="reels" className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent data-[state=state=active]:border-foreground data-[state=active]:border-foreground">
+          <TabsTrigger value="reels" className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground">
             <Film className="h-4 w-4" /> Reels
           </TabsTrigger>
         </TabsList>
@@ -127,9 +127,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
             <div className="grid grid-cols-3 gap-0.5 p-0.5">
               {imagePosts.map(post => (
                 <button key={post.id} onClick={() => setSelectedPost(post)} className="relative aspect-square bg-muted overflow-hidden group">
-                  {post.reposted_by && post.reposted_by.length > 0 && (
-                    <div className="absolute top-1.5 right-1.5 z-10 bg-black/50 rounded-full p-1"><Repeat2 className="h-3 w-3 text-white" /></div>
-                  )}
+                  {post.reposted_by && post.reposted_by.length > 0 && <div className="absolute top-1.5 right-1.5 z-10 bg-black/50 rounded-full p-1"><Repeat2 className="h-3 w-3 text-white" /></div>}
                   {post.media_url ? (
                     <Image src={post.media_url} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-200" />
                   ) : (
@@ -145,9 +143,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
 
         <TabsContent value="reels">
           {query.isLoading ? (
-            <div className="grid grid-cols-3 gap-0.5 p-0.5">
-              {Array.from({ length: 9 }).map((_, i) => <Skeleton key={i} className="aspect-[9/16]" />)}
-            </div>
+            <div className="grid grid-cols-3 gap-0.5 p-0.5">{Array.from({ length: 9 }).map((_, i) => <Skeleton key={i} className="aspect-[9/16]" />)}</div>
           ) : query.isError ? (
             <div className="py-14 text-center text-sm text-destructive px-4">Reels could not be loaded. Please refresh the page.</div>
           ) : videoPosts.length === 0 ? (
@@ -172,9 +168,6 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-3" onClick={() => setSelectedPost(null)}>
           <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl" onClick={e => e.stopPropagation()}>
             <PostCard post={selectedPost} onDelete={deletePost} />
-            {selectedPost.reposted_by?.some(r => r.id === user?.id) && (
-              <div className="sr-only"><Trash2 /></div>
-            )}
           </div>
         </div>
       )}
