@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Flag, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 
 export type ReportTargetType = 'post' | 'story' | 'comment' | 'story_comment' | 'message' | 'user'
 
@@ -27,6 +28,7 @@ const REASONS: { value: string; label: string }[] = [
 // column the target id goes into is decided from `targetType`.
 export function ReportModal({ reporterId, reportedUserId, targetType, targetId, onClose }: ReportModalProps) {
   const supabase = createClient()
+  const track = useTrackEvent()
   const [reason, setReason] = useState<string | null>(null)
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -62,6 +64,16 @@ export function ReportModal({ reporterId, reportedUserId, targetType, targetId, 
       return
     }
     setSubmitted(true)
+
+    // Feeds into the ranking pipeline's spam/quality signal - only posts
+    // and stories are ranked content, so a report on a comment/message/
+    // user account (still fully recorded in `reports` above) doesn't have
+    // a ranking target to attach to.
+    if (targetType === 'post' && targetId) {
+      track({ target_type: 'post', target_id: targetId, creator_id: reportedUserId, event_type: 'report' })
+    } else if (targetType === 'story' && targetId) {
+      track({ target_type: 'story', target_id: targetId, creator_id: reportedUserId, event_type: 'report' })
+    }
   }
 
   return (
