@@ -10,8 +10,14 @@ import { Message } from '@/lib/types/database.types'
 // instead of pulling a chat's entire history into memory on open.
 const PAGE_SIZE = 40
 
+// A locally-added placeholder for a photo/video that's still uploading -
+// see addPendingMessage below. `_uploading`/`_uploadFailed` only ever
+// exist on the client; they're never written to or read from the
+// database.
+export type ClientMessage = Message & { _uploading?: boolean; _uploadFailed?: boolean }
+
 export function useRealtimeMessages(chatId: string, currentUserId: string) {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ClientMessage[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<string[]>([])
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
@@ -279,6 +285,55 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)))
   }, [])
 
+  // Lets a photo/video show up in the thread the instant it's picked,
+  // "Sending..." overlay and all, while the actual upload happens in the
+  // background - see MessageInput's handleSubmit. This is what makes
+  // sending a video FEEL instant even though the bytes are still moving;
+  // the alternative (blocking the whole composer until the upload
+  // finishes) is the slow-feeling behavior this replaces.
+  const addPendingMessage = useCallback((tempId: string, payload: {
+    content?: string
+    replyToId?: string | null
+    mediaUrl: string
+    mediaType: 'image' | 'video'
+  }) => {
+    const pending: ClientMessage = {
+      id: tempId,
+      chat_id: chatId,
+      sender_id: currentUserId,
+      content: payload.content?.trim() || '',
+      post_id: null,
+      story_id: null,
+      is_aperonix_reply: false,
+      is_read: false,
+      deleted_for_sender: false,
+      deleted_for_recipient: false,
+      is_edited: false,
+      reply_to_id: payload.replyToId || null,
+      media_url: payload.mediaUrl,
+      media_type: payload.mediaType,
+      media_duration_seconds: null,
+      sticker: null,
+      is_system: false,
+      created_at: new Date().toISOString(),
+      _uploading: true,
+    }
+    setMessages((prev) => [...prev, pending])
+  }, [chatId, currentUserId])
+
+  // Upload finished - do the real insert (via the normal sendMessage path)
+  // and swap the placeholder out for it.
+  const resolvePendingMessage = useCallback(async (tempId: string, payload: Parameters<typeof sendMessage>[0]) => {
+    await sendMessage(payload)
+    setMessages((prev) => prev.filter((m) => m.id !== tempId))
+  }, [sendMessage])
+
+  // Upload failed - leave the bubble in place but flip it to a dismissable
+  // error state instead of silently losing what the person tried to send.
+  const failPendingMessage = useCallback((tempId: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, _uploading: false, _uploadFailed: true } : m)))
+  }, [])
+
   return {
     messages,
     isTyping,
@@ -287,6 +342,9 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
     sendTypingIndicator,
     removeMessageLocally,
     patchMessageLocally,
+    addPendingMessage,
+    resolvePendingMessage,
+    failPendingMessage,
     loadOlderMessages,
     hasMoreOlder,
     isLoadingOlder,
