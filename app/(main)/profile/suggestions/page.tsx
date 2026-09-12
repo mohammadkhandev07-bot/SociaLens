@@ -40,7 +40,7 @@ export default function SuggestionsPage() {
       if (candidates.length === 0 || !user) return []
 
       // Suggestions Privacy (Settings > Privacy > Suggestions Privacy) -
-      // separate from Search Result Privacy, so someone can be findable
+      // Separate from Search Result Privacy, so someone can be findable
       // By search without necessarily being pushed into everyone's
       // suggestions feed, or vice versa.
       const ids = candidates.map(p => p.id)
