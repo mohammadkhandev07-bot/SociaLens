@@ -20,6 +20,9 @@ export interface SendPayload {
 
 interface MessageInputProps {
   onSend: (payload: SendPayload) => void
+  onSendPending?: (tempId: string, payload: { content?: string; replyToId?: string | null; mediaUrl: string; mediaType: 'image' | 'video' }) => boolean
+  onResolvePending?: (tempId: string, payload: SendPayload) => void
+  onFailPending?: (tempId: string) => void
   onTyping: () => void
   currentUserId: string
   disabled?: boolean
@@ -66,7 +69,7 @@ async function uploadChatMedia(file: File | Blob, filename: string, userId: stri
   return data.publicUrl
 }
 
-export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyingTo, onCancelReply }: MessageInputProps) {
+export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPending, onTyping, currentUserId, disabled, replyingTo, onCancelReply }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
@@ -236,17 +239,60 @@ export function MessageInput({ onSend, onTyping, currentUserId, disabled, replyi
     }
 
     if (attachedFile) {
-      setSending(true)
-      try {
-        const url = await uploadChatMedia(attachedFile, attachedFile.name, currentUserId)
-        onSend({ content: text, mediaUrl: url, mediaType: attachedType!, replyToId: replyingTo?.id })
+      // Photo/video: show it in the thread immediately (as an "uploading"
+      // bubble - see ChatMessage) and let the actual upload happen in the
+      // background, instead of freezing the composer for however long a
+      // 1-2 minute video takes to reach Supabase Storage. This is the fix
+      // for sending feeling slow - the message appears right away, same
+      // as Instagram/WhatsApp, even though the real transfer still takes
+      // the time it takes.
+      if (onSendPending && onResolvePending) {
+        const tempId = crypto.randomUUID()
+        const localUrl = attachedPreviewUrl!
+        const fileToUpload = attachedFile
+        const fileName = attachedFile.name
+        const mediaType = attachedType!
+        const contentText = text
+        const replyToId = replyingTo?.id
+
+        const accepted = onSendPending(tempId, { content: contentText, replyToId, mediaUrl: localUrl, mediaType })
+        if (!accepted) return // e.g. blocked by a messaging restriction - nothing was shown, nothing to upload
+
         setMessage('')
-        clearAttachment()
+        // Reset the composer WITHOUT revoking the preview URL - the
+        // pending bubble now owns it and will revoke it itself once the
+        // real upload finishes (see the finally block below).
+        setAttachedFile(null)
+        setAttachedType(null)
+        setAttachedPreviewUrl(null)
+        setAttachError(null)
         onCancelReply?.()
-      } catch {
-        setAttachError('Could not send that file. Try again.')
-      } finally {
-        setSending(false)
+
+        ;(async () => {
+          try {
+            const url = await uploadChatMedia(fileToUpload, fileName, currentUserId)
+            await onResolvePending(tempId, { content: contentText, mediaUrl: url, mediaType, replyToId })
+          } catch {
+            onFailPending?.(tempId)
+          } finally {
+            URL.revokeObjectURL(localUrl)
+          }
+        })()
+      } else {
+        // Fallback for any caller that hasn't wired up the pending-message
+        // callbacks - behaves exactly as before (blocks until uploaded).
+        setSending(true)
+        try {
+          const url = await uploadChatMedia(attachedFile, attachedFile.name, currentUserId)
+          onSend({ content: text, mediaUrl: url, mediaType: attachedType!, replyToId: replyingTo?.id })
+          setMessage('')
+          clearAttachment()
+          onCancelReply?.()
+        } catch {
+          setAttachError('Could not send that file. Try again.')
+        } finally {
+          setSending(false)
+        }
       }
       return
     }
