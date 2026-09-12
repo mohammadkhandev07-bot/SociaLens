@@ -10,11 +10,13 @@ import { rankReels } from '@/lib/recommendation/rankReels'
 const FEED_PAGE_SIZE = 10
 const EXPLORE_PAGE_SIZE = 15
 const REELS_PAGE_SIZE = 8
-// Reels fetch a wider chronological window per "page" than what's shown,
-// So there's an actual pool to rank/diversify/explore within - the same
-// bounded-window approach TikTok-style feeds use instead of scoring the
-// entire history every time.
 const REELS_CANDIDATE_WINDOW = REELS_PAGE_SIZE * 4
+
+// Be explicit about the posts -> profiles foreign key. This avoids PostgREST
+// resolving the nested relation differently between environments and makes
+// the shape returned to PostWithProfile deterministic.
+const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
+const REPOST_POST_SELECT = 'posts(*, profiles!posts_user_id_fkey(*))'
 
 async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   const supabase = createClient()
@@ -31,14 +33,6 @@ async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   return posts.map(p => ({ ...p, is_liked: likedSet.has(p.id) }))
 }
 
-// Loads the feed page by page (10 posts at a time, newest first) instead
-// Of pulling everything a person follows into memory on every visit -
-// the same "load more as you scroll" behavior Instagram/Facebook use.
-// Own posts and reposts are two separate tables, so each page pulls a
-// batch from both (bounded by the same cursor), merges them by date, and
-// only keeps the top page-size worth - the cursor for the next page is
-// simply the oldest item actually shown, so nothing gets skipped or
-// repeated at the boundary between pages.
 export function useFeedPosts(userId?: string) {
   const supabase = createClient()
 
@@ -59,23 +53,18 @@ export function useFeedPosts(userId?: string) {
 
       let ownQuery = supabase
         .from('posts')
-        .select('*, profiles(*)')
+        .select(POST_SELECT)
         .in('user_id', followingIds)
         .order('created_at', { ascending: false })
         .limit(FEED_PAGE_SIZE)
       if (pageParam) ownQuery = ownQuery.lt('created_at', pageParam)
       const { data, error } = await ownQuery
       if (error) throw error
-      const ownPosts = await fetchPostsWithLikes(data as PostWithProfile[], userId)
+      const ownPosts = await fetchPostsWithLikes((data ?? []) as PostWithProfile[], userId)
 
-      // Reposts by people you follow (and your own reposts) also show up
-      // in the feed - the post itself still displays the ORIGINAL
-      // author's name/avatar, only a small "X reposted" badge on top
-      // Shows who reposted it. Sorted into the feed by when it was
-      // reposted, not when the original post was first made.
       let repostQuery = supabase
         .from('reposts')
-        .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type), posts(*, profiles(*))')
+        .select(`created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type), ${REPOST_POST_SELECT}`)
         .in('user_id', followingIds)
         .order('created_at', { ascending: false })
         .limit(FEED_PAGE_SIZE)
@@ -86,8 +75,8 @@ export function useFeedPosts(userId?: string) {
         .filter((r: any) => r.posts)
         .map((r: any) => ({
           ...(r.posts as PostWithProfile),
-          created_at: r.created_at, // sort position = when it was reposted
-          reposted_by: [r.profiles],
+          created_at: r.created_at,
+          reposted_by: r.profiles ? [r.profiles] : [],
         }))
       const repostedWithLikes = await fetchPostsWithLikes(repostedPosts, userId)
 
@@ -95,21 +84,12 @@ export function useFeedPosts(userId?: string) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, FEED_PAGE_SIZE)
 
-      // The feed should never sit empty just because you don't follow
-      // anyone yet (or the people you follow haven't posted much) - once
-      // it's running thin on the very first page, top it up with public
-      // posts from everyone else, the same way Instagram fills your feed
-      // with "Suggested" content. Row Level Security still applies here,
-      // so private accounts and restricted post_privacy settings stay
-      // hidden exactly like they do everywhere else in the app. Only
-      // done on the first page - later pages just end once real
-      // followed/reposted content runs out.
       const MIN_FEED_SIZE = 5
       if (!pageParam && merged.length < MIN_FEED_SIZE) {
         const excludeIds = merged.map((p) => p.id)
         let suggestedQuery = supabase
           .from('posts')
-          .select('*, profiles(*)')
+          .select(POST_SELECT)
           .order('created_at', { ascending: false })
           .limit(20)
         if (excludeIds.length > 0) {
@@ -118,22 +98,13 @@ export function useFeedPosts(userId?: string) {
         const { data: suggested } = await suggestedQuery
         if (suggested && suggested.length > 0) {
           const suggestedWithLikes = await fetchPostsWithLikes(suggested as PostWithProfile[], userId)
-          const tagged = suggestedWithLikes.map((p) => ({ ...p, is_suggested: true }))
-          merged = [...merged, ...tagged]
+          merged = [...merged, ...suggestedWithLikes.map((p) => ({ ...p, is_suggested: true }))]
         }
       }
 
-      // Next page starts just before the oldest post shown here. Fewer
-      // than a full page from BOTH sources means there's nothing older
-      // left to fetch. Cursor is captured from the raw chronological
-      // order BEFORE the relevance re-rank below, so paging never skips
-      // or repeats a post just because ranking moved it around on screen.
       const gotFullPage = ownPosts.length === FEED_PAGE_SIZE || repostedWithLikes.length === FEED_PAGE_SIZE
       const oldest = merged.length > 0 ? merged[merged.length - 1].created_at : null
 
-      // Relevance + engagement + freshness re-rank of what's already been
-      // fetched (see rankFeedPosts) - display order only, doesn't affect
-      // what gets fetched or the cursor above.
       const ctx = await getViewerContext(supabase, userId)
       const ranked = rankFeedPosts(merged, ctx)
 
@@ -145,9 +116,6 @@ export function useFeedPosts(userId?: string) {
   })
 }
 
-// Explore's "most liked" grid, paged in the same spirit - fetches by
-// engagement rank rather than time, so the cursor here is a row offset
-// instead of a timestamp.
 export function useExplorePosts(userId?: string) {
   const supabase = createClient()
 
@@ -157,15 +125,16 @@ export function useExplorePosts(userId?: string) {
     queryFn: async ({ pageParam }) => {
       const { data, error } = await supabase
         .from('posts')
-        .select('*, profiles(*)')
+        .select(POST_SELECT)
         .order('likes_count', { ascending: false })
         .range(pageParam, pageParam + EXPLORE_PAGE_SIZE - 1)
 
       if (error) throw error
-      const posts = userId ? await fetchPostsWithLikes(data as PostWithProfile[], userId) : (data as PostWithProfile[])
+      const rows = (data ?? []) as PostWithProfile[]
+      const posts = userId ? await fetchPostsWithLikes(rows, userId) : rows
       return {
         posts,
-        nextCursor: data.length === EXPLORE_PAGE_SIZE ? pageParam + EXPLORE_PAGE_SIZE : null,
+        nextCursor: rows.length === EXPLORE_PAGE_SIZE ? pageParam + EXPLORE_PAGE_SIZE : null,
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -180,13 +149,9 @@ export function useReelsPosts(userId?: string) {
     queryKey: ['reels-posts', userId],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
-      // Fetches a wider chronological window than one page actually
-      // shows - Candidate Generation for the ranking pipeline below.
-      // Cursor/pagination stays based on this raw window (see nextCursor),
-      // so paging correctness never depends on how ranking reorders it.
       let query = supabase
         .from('posts')
-        .select('*, profiles(*)')
+        .select(POST_SELECT)
         .eq('media_type', 'video')
         .order('created_at', { ascending: false })
         .limit(REELS_CANDIDATE_WINDOW)
@@ -194,15 +159,10 @@ export function useReelsPosts(userId?: string) {
       const { data, error } = await query
 
       if (error) throw error
-      let posts = data as PostWithProfile[]
+      let posts = (data ?? []) as PostWithProfile[]
       if (userId) posts = await fetchPostsWithLikes(posts, userId)
-      const nextCursor = data.length === REELS_CANDIDATE_WINDOW ? (posts[posts.length - 1]?.created_at ?? null) : null
+      const nextCursor = posts.length === REELS_CANDIDATE_WINDOW ? (posts[posts.length - 1]?.created_at ?? null) : null
 
-      // Reels already show everyone's videos (not just people you follow),
-      // so reposts don't need a separate duplicate entry here like the
-      // home feed does - this just checks whether someone you follow
-      // reposted one of these same videos, so the "X reposted" badge can
-      // still show on it.
       if (userId) {
         const { data: following } = await supabase
           .from('follows')
@@ -219,13 +179,10 @@ export function useReelsPosts(userId?: string) {
             .order('created_at', { ascending: false })
 
           if (reposts && reposts.length > 0) {
-            // Multiple people you follow can repost the same reel - collect
-            // ALL of them per post (most recent first) instead of overwriting
-            // down to just the last one, so the badge can show everyone.
             const repostMap = new Map<string, any[]>()
             for (const r of reposts as any[]) {
               const existing = repostMap.get(r.post_id) ?? []
-              existing.push(r.profiles)
+              if (r.profiles) existing.push(r.profiles)
               repostMap.set(r.post_id, existing)
             }
             posts = posts.map(p => repostMap.has(p.id) ? { ...p, reposted_by: repostMap.get(p.id) } : p)
@@ -233,10 +190,6 @@ export function useReelsPosts(userId?: string) {
         }
       }
 
-      // Safety/Spam Filter -> Feature Calc -> Personalization -> Ranking ->
-      // Freshness/Exploration -> Diversity (see rankReels). Only the top
-      // REELS_PAGE_SIZE of the ranked window is actually shown - the rest
-      // of the window was purely there to have something worth ranking.
       const ctx = await getViewerContext(supabase, userId)
       const ranked = rankReels(posts, ctx, REELS_PAGE_SIZE)
 
