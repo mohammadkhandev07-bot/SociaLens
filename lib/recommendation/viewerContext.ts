@@ -8,7 +8,7 @@ export interface ViewerContext {
 }
 
 // Bounded, indexed lookups only (top-N affinity rows, not a full table
-// scan) - this runs on every feed/reels page load, so it has to stay
+// scan) - this runs on every feed/reels page load, So it has to stay
 // cheap on Supabase's free plan.
 export async function getViewerContext(supabase: SupabaseClient, userId: string | undefined): Promise<ViewerContext> {
   const empty: ViewerContext = {
