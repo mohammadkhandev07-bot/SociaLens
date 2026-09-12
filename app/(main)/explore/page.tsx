@@ -51,17 +51,24 @@ export default function ExplorePage() {
       if (!user) return candidates.filter(p => p.search_privacy === 'everyone').slice(0, 10)
 
       const ids = candidates.map(p => p.id)
-      const [{ data: iFollow }, { data: followMe }, { data: selectedMe }] = await Promise.all([
+      const [{ data: iFollow }, { data: followMe }, { data: selectedMe }, { data: blockRows }] = await Promise.all([
         supabase.from('follows').select('following_id').eq('follower_id', user.id).eq('status', 'accepted').in('following_id', ids),
         supabase.from('follows').select('follower_id').eq('following_id', user.id).eq('status', 'accepted').in('follower_id', ids),
         supabase.from('privacy_selected_users').select('owner_id').eq('category', 'search').eq('selected_user_id', user.id).in('owner_id', ids),
+        supabase.from('blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
       ])
       const iFollowSet = new Set((iFollow || []).map((r: any) => r.following_id))
       const followsMeSet = new Set((followMe || []).map((r: any) => r.follower_id))
       const selectedMeSet = new Set((selectedMe || []).map((r: any) => r.owner_id))
+      // Anyone on either side of a block with me never shows up in search,
+      // regardless of their search_privacy setting.
+      const blockedRelationSet = new Set(
+        (blockRows || []).flatMap((b: any) => [b.blocker_id, b.blocked_id]).filter((id: string) => id !== user.id)
+      )
 
       const visible = candidates.filter(p => {
         if (p.id === user.id) return true
+        if (blockedRelationSet.has(p.id)) return false
         switch (p.search_privacy) {
           case 'everyone': return true
           case 'followers': return iFollowSet.has(p.id)
