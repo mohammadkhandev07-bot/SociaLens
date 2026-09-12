@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
-import { ProfileTabs } from '@/components/profile/ProfileTabs'
+import { ProfileTabsFixed } from '@/components/profile/ProfileTabsFixed'
 import { LockedProfileView } from '@/components/profile/LockedProfileView'
 import { FollowRequestsDialog } from '@/components/profile/FollowRequestsDialog'
 
@@ -13,11 +13,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const { username } = await params
   const supabase = await createClient()
 
-  // Middleware already verified this request is authenticated (a network
-  // round-trip to Supabase's auth server) before this page even started
-  // rendering - getSession() here just reads that already-validated
-  // Session back out of the cookie locally, instead of paying for a
-  // second full auth-server round-trip for the exact same check.
+  // Middleware already verified this request is authenticated before this page started rendering.
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user ?? null
 
@@ -32,8 +28,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const isOwn = user?.id === profile.id
 
   let isFollowing = false
-  // Whether the PROFILE OWNER follows this viewer back - a fully locked
-  // Private account only opens up to people the owner themselves follows.
   let ownerFollowsViewer = false
   if (user && !isOwn) {
     const [{ data: follow }, { data: ownerFollowsMe }] = await Promise.all([
@@ -58,7 +52,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           <FollowRequestsDialog userId={profile.id} />
         </div>
       )}
-      <ProfileTabs
+      <ProfileTabsFixed
         profileId={profile.id}
         isPrivate={profile.is_private}
         isFollowing={isFollowing}
