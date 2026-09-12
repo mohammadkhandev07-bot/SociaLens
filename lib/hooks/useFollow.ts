@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 
 export function useFollowStatus(followerId?: string, followingId?: string) {
   const supabase = createClient()
@@ -25,6 +26,7 @@ export function useFollowStatus(followerId?: string, followingId?: string) {
 export function useFollowUser() {
   const supabase = createClient()
   const queryClient = useQueryClient()
+  const track = useTrackEvent()
 
   return useMutation({
     mutationFn: async ({
@@ -42,6 +44,7 @@ export function useFollowUser() {
         status: isPrivate ? 'pending' : 'accepted',
       })
       if (error) throw error
+      track({ target_type: 'post', target_id: followingId, creator_id: followingId, event_type: 'follow' })
 
       if (!isPrivate) {
         // followers_count/following_count are maintained entirely by a
