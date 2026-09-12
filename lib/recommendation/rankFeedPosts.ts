@@ -4,7 +4,7 @@ import { scorePost, diversify, FEED_WEIGHTS } from './scoring'
 
 /**
  * Re-ranks one already-fetched feed page (own + followed + reposts, plus
- * the occasional suggested top-up - see useFeedPosts) by relevance,
+ * The occasional suggested top-up - see useFeedPosts) by relevance,
  * engagement and freshness, instead of showing it in raw chronological
  * order. This intentionally only reorders WITHIN a page rather than
  * across the whole follow graph, so the existing time-cursor pagination
