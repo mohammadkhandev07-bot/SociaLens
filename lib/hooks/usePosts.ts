@@ -105,8 +105,19 @@ export function useFeedPosts(userId?: string) {
       const gotFullPage = ownPosts.length === FEED_PAGE_SIZE || repostedWithLikes.length === FEED_PAGE_SIZE
       const oldest = merged.length > 0 ? merged[merged.length - 1].created_at : null
 
-      const ctx = await getViewerContext(supabase, userId)
-      const ranked = rankFeedPosts(merged, ctx)
+      // Relevance + engagement + freshness re-rank of what's already been
+      // fetched (see rankFeedPosts) - display order only, doesn't affect
+      // what gets fetched or the cursor above. Falls back to the plain
+      // chronological order (exactly what this looked like before ranking
+      // existed) if anything about the ranking pipeline itself fails, so a
+      // bug or a not-yet-applied migration can never make the feed empty.
+      let ranked = merged
+      try {
+        const ctx = await getViewerContext(supabase, userId)
+        ranked = rankFeedPosts(merged, ctx)
+      } catch (err) {
+        console.error('feed ranking failed, showing chronological order', err)
+      }
 
       return { posts: ranked, nextCursor: gotFullPage ? oldest : null }
     },
@@ -190,8 +201,20 @@ export function useReelsPosts(userId?: string) {
         }
       }
 
-      const ctx = await getViewerContext(supabase, userId)
-      const ranked = rankReels(posts, ctx, REELS_PAGE_SIZE)
+      // Safety/Spam Filter -> Feature Calc -> Personalization -> Ranking ->
+      // Freshness/Exploration -> Diversity (see rankReels). Falls back to
+      // plain chronological (trimmed to one page) if the ranking pipeline
+      // itself throws for any reason - a reel must never simply fail to
+      // appear because of a bug or a not-yet-run migration in the
+      // personalization layer.
+      let ranked = posts.slice(0, REELS_PAGE_SIZE)
+      try {
+        const ctx = await getViewerContext(supabase, userId)
+        const result = rankReels(posts, ctx, REELS_PAGE_SIZE)
+        if (result.length > 0) ranked = result
+      } catch (err) {
+        console.error('reels ranking failed, showing chronological order', err)
+      }
 
       return { posts: ranked, nextCursor }
     },
