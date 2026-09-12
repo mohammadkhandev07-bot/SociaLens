@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { MoreVertical, Reply as ReplyIcon, Smile, Pencil, Trash2, EyeOff, Copy, Volume2, Square, Forward, Check, Download, Gauge, Phone, Video, Flag } from 'lucide-react'
+import { MoreVertical, Reply as ReplyIcon, Smile, Pencil, Trash2, EyeOff, Copy, Volume2, Square, Forward, Check, Download, Gauge, Phone, Video, Flag, Loader2 } from 'lucide-react'
 import { SharedPostMessage } from './SharedPostMessage'
 import { SharedStoryMessage } from './SharedStoryMessage'
 import { AperonixReplyMessage } from './AperonixReplyMessage'
@@ -480,14 +480,31 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             </p>
           </div>
         ) : (mediaType === 'image' || mediaType === 'video') ? (
-          <div className={cn('rounded-2xl overflow-hidden max-w-[240px]', isOwn ? 'rounded-br-sm' : 'rounded-bl-sm')}>
+          <div className={cn('rounded-2xl overflow-hidden max-w-[240px] relative', isOwn ? 'rounded-br-sm' : 'rounded-bl-sm')}>
             {mediaType === 'image' ? (
-              <button onClick={() => setLightbox({ type: 'image', url: mediaUrl! })} className="block w-full">
+              <button onClick={() => setLightbox({ type: 'image', url: mediaUrl! })} className="block w-full" disabled={(message as any)._uploading}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={mediaUrl!} alt="Photo" className="w-full max-h-72 object-cover" />
               </button>
             ) : (
-              <video src={mediaUrl!} controls className="w-full max-h-72" />
+              <video src={mediaUrl!} controls={!(message as any)._uploading} className="w-full max-h-72" />
+            )}
+            {(message as any)._uploading && (
+              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 text-white">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="text-xs font-medium">Sending{mediaType === 'video' ? ' video' : ''}...</span>
+              </div>
+            )}
+            {(message as any)._uploadFailed && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5 text-white px-3 text-center">
+                <span className="text-xs font-medium">Couldn't send</span>
+                <button
+                  onClick={() => onRemoveMessage?.(message.id)}
+                  className="text-[11px] underline text-white/80 hover:text-white"
+                >
+                  Dismiss
+                </button>
+              </div>
             )}
             {message.content && (
               <div className={cn('px-3 py-2 text-sm', isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted')}>
