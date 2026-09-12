@@ -48,7 +48,7 @@ export default function ChatRoomPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
+  const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, addPendingMessage, resolvePendingMessage, failPendingMessage, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
     useRealtimeMessages(chatId, user?.id ?? '')
   const { data: storyGroups = [] } = useActiveStories(user?.id)
 
@@ -58,6 +58,24 @@ export default function ChatRoomPage() {
       return
     }
     return sendMessage(payload)
+  }
+
+  const guardedAddPendingMessage = (tempId: string, payload: Parameters<typeof addPendingMessage>[1]): boolean => {
+    if (isRestricted(profile?.restrict_message_until)) {
+      setShowRestrictionPopup(true)
+      return false
+    }
+    addPendingMessage(tempId, payload)
+    return true
+  }
+
+  const guardedResolvePendingMessage: typeof resolvePendingMessage = async (tempId, payload) => {
+    if (isRestricted(profile?.restrict_message_until)) {
+      failPendingMessage(tempId)
+      setShowRestrictionPopup(true)
+      return
+    }
+    return resolvePendingMessage(tempId, payload)
   }
 
   const other = chat && user ? (chat.participant1_id === user.id ? chat.participant2 : chat.participant1) : null
@@ -388,6 +406,9 @@ export default function ChatRoomPage() {
       {canSendFinal ? (
         <MessageInput
           onSend={guardedSendMessage}
+          onSendPending={guardedAddPendingMessage}
+          onResolvePending={guardedResolvePendingMessage}
+          onFailPending={failPendingMessage}
           onTyping={sendTypingIndicator}
           currentUserId={user.id}
           replyingTo={replyingTo}
