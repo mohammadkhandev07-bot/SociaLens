@@ -12,7 +12,7 @@ export function freshnessScore(createdAt: string, halfLifeHours = 48): number {
 // Deliberately NOT likes-dominated: comments/shares/saves take real
 // intent (typing, choosing someone to send to, coming back to it later)
 // and outweigh a like, which costs nothing. Watch behavior counts too,
-// for video.
+// For video.
 export function engagementScore(post: PostWithProfile): number {
   const views = Math.max(post.views_count || 0, 1)
   const likeRate = (post.likes_count || 0) / views
