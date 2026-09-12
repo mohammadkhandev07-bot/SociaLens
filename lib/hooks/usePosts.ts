@@ -11,7 +11,7 @@ const FEED_PAGE_SIZE = 10
 const EXPLORE_PAGE_SIZE = 15
 const REELS_PAGE_SIZE = 8
 // Reels fetch a wider chronological window per "page" than what's shown,
-// so there's an actual pool to rank/diversify/explore within - the same
+// So there's an actual pool to rank/diversify/explore within - the same
 // bounded-window approach TikTok-style feeds use instead of scoring the
 // entire history every time.
 const REELS_CANDIDATE_WINDOW = REELS_PAGE_SIZE * 4
