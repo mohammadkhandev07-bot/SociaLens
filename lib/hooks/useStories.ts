@@ -83,11 +83,51 @@ export function useActiveStories(userId?: string) {
       const result = Array.from(groups.values())
       result.forEach((g) => g.stories.reverse())
 
-      // Own stories always come first, then everyone else by most recent story.
+      // Rank by relationship + how much this viewer actually engages with
+      // that author's stories (views/replies/reactions), not just posting
+      // time - a close friend's stories from a few hours ago should beat
+      // someone barely-followed who just posted, the same way Instagram's
+      // story tray reorders itself around who you actually interact with.
+      const otherAuthorIds = result.map((g) => g.userId).filter((id) => id !== userId)
+      let engagementScore = new Map<string, number>()
+      if (otherAuthorIds.length > 0) {
+        const authorStoryIds = stories.filter((s) => otherAuthorIds.includes(s.user_id)).map((s) => s.id)
+        const [{ data: myViews }, { data: myLikes }, { data: myReactions }, { data: mutualFollowRows }] = await Promise.all([
+          supabase.from('story_views').select('story_id').eq('viewer_id', userId).in('story_id', authorStoryIds),
+          supabase.from('story_likes').select('story_id').eq('user_id', userId).in('story_id', authorStoryIds),
+          supabase.from('story_reactions').select('story_id').eq('user_id', userId).in('story_id', authorStoryIds),
+          supabase.from('follows').select('follower_id, following_id').eq('status', 'accepted')
+            .or(`and(follower_id.eq.${userId},following_id.in.(${otherAuthorIds.join(',')})),and(following_id.eq.${userId},follower_id.in.(${otherAuthorIds.join(',')}))`),
+        ])
+        const storyToAuthor = new Map(stories.map((s) => [s.id, s.user_id]))
+        const bump = (rows: { story_id: string }[] | null, weight: number) => {
+          for (const r of rows || []) {
+            const author = storyToAuthor.get(r.story_id)
+            if (author) engagementScore.set(author, (engagementScore.get(author) || 0) + weight)
+          }
+        }
+        bump(myViews, 1)
+        bump(myLikes, 3)
+        bump(myReactions, 2)
+
+        // Mutual follow (both ways) counts as closer than a one-way follow.
+        const followsThem = new Set((mutualFollowRows || []).filter((r: any) => r.follower_id === userId).map((r: any) => r.following_id))
+        const followsMe = new Set((mutualFollowRows || []).filter((r: any) => r.following_id === userId).map((r: any) => r.follower_id))
+        for (const id of otherAuthorIds) {
+          if (followsThem.has(id) && followsMe.has(id)) engagementScore.set(id, (engagementScore.get(id) || 0) + 4)
+        }
+      }
+
+      // Own stories always come first, then everyone else ranked by
+      // relationship/engagement score (most-recent story as the tiebreak,
+      // preserved via each group's position from the query above).
+      const originalOrder = new Map(result.map((g, i) => [g.userId, i]))
       result.sort((a, b) => {
         if (a.userId === userId) return -1
         if (b.userId === userId) return 1
-        return 0
+        const scoreDiff = (engagementScore.get(b.userId) || 0) - (engagementScore.get(a.userId) || 0)
+        if (scoreDiff !== 0) return scoreDiff
+        return (originalOrder.get(a.userId)! - originalOrder.get(b.userId)!)
       })
 
       return result
