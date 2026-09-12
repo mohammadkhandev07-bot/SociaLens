@@ -6,7 +6,7 @@ const HARD_HIDE_REPORT_COUNT = 8 // heavily-reported content is hidden pending m
 const EXPLORATION_RATIO = 0.2 // ~1 in 5 slots reserved for fair discovery of new/low-exposure reels
 
 /**
- * candidates: a chronologically-fetched window of reels (bigger than one
+ * Candidates: a chronologically-fetched window of reels (bigger than one
  * page - see useReelsPosts) already scoped to what RLS/privacy allows.
  * Runs: Safety/Spam Filter -> Feature Calc (already on each row) ->
  * Personalization -> Ranking -> Freshness/Exploration -> Diversity.
