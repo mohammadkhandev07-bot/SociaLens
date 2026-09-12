@@ -12,7 +12,7 @@ export interface StoryGroup {
 }
 
 // Groups this user's own + their followed accounts' active stories by
-// author, most-recently-posted author first. "Active" here just means the
+// Author, most-recently-posted author first. "Active" here just means the
 // Row is visible at all - the database RLS policy already hides anything
 // past its 24h expires_at, so nothing extra needs to be checked here.
 // On top of each individual story's own "who can see this?" audience
