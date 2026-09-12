@@ -269,17 +269,17 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
       setUploadProgress(90)
 
       const { error: postError } = await supabase
-  .from('posts')
-  .insert({
-    user_id: user.id,
-    content: content || null,
-    media_url,
-    media_type: mediaType,
-  })
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          content: content || null,
+          media_url,
+          media_type: mediaType,
+        })
 
-if (postError) {
-  throw new Error(`Post creation failed: ${postError.message}`)
-}
+      if (postError) {
+        throw new Error(`Post creation failed: ${postError.message}`)
+      }
       await supabase.rpc('increment_posts_count', { profile_id: user.id })
       setUploadProgress(100)
 
