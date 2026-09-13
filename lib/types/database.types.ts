@@ -337,6 +337,8 @@ export type Story = {
   global_font_family: string | null
   visibility: StoryVisibility
   visibility_selected_ids: string[] | null
+  link_url: string | null
+  link_label: string | null
   created_at: string
   expires_at: string
 }
