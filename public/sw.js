@@ -27,8 +27,23 @@ self.addEventListener('activate', e => {
 })
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return
   const url = new URL(e.request.url)
+
+  // Web Share Target: another app's share sheet POSTs the shared photo/
+  // video straight to /share. Handling that POST right here, inside the
+  // service worker, means the file bytes never have to travel through a
+  // server function at all - they're read and stashed in the on-device
+  // Cache Storage API, then handed off to a normal page as a plain GET.
+  // That's what actually fixes big videos: Vercel's serverless functions
+  // have a hard ~4.5MB request-body limit that no amount of server code
+  // can raise, so routing the file through one was the real bug, not the
+  // file's size.
+  if (e.request.method === 'POST' && url.pathname === '/share' && url.origin === location.origin) {
+    e.respondWith(handleShareTarget(e.request))
+    return
+  }
+
+  if (e.request.method !== 'GET') return
   if (url.origin !== location.origin) return
 
   e.respondWith(
@@ -43,6 +58,21 @@ self.addEventListener('fetch', e => {
       )
   )
 })
+
+async function handleShareTarget(request) {
+  const origin = new URL(request.url).origin
+  // Sharing INTO SociaLens (the "Add to Story" flow) is coming in a
+  // future version - for now this just accepts the share so the OS share
+  // sheet doesn't 404/error out, and sends the person to a friendly
+  // "coming soon" page instead. Deliberately not reading/caching the
+  // shared file here since nothing downstream uses it yet.
+  try {
+    await request.formData()
+  } catch (err) {
+    // Ignore - either way, still land on the coming-soon page below.
+  }
+  return Response.redirect(`${origin}/share/handle`, 303)
+}
 
 self.addEventListener('push', e => {
   if (!e.data) return
