@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { X, Music, MoreVertical, Heart, MessageCircle, Send, Pencil, EyeOff, Trash2, Loader2, Eye, Flag } from 'lucide-react'
+import { X, Music, MoreVertical, Heart, MessageCircle, Send, Pencil, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
 import { useDeleteStory } from '@/lib/hooks/useStories'
@@ -536,6 +536,25 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
                 {activeMusicTitle}{activeMusicArtist ? ` \u00b7 ${activeMusicArtist}` : ''}
               </span>
             </div>
+          )}
+
+          {story.link_url && (
+            // Tapping just opens the link normally - on a phone where the
+            // source app (YouTube, Instagram, etc.) is installed and
+            // registered for that domain as an App Link/Universal Link,
+            // the OS opens the app itself; otherwise it opens in the
+            // browser. That's the standard, reliable way this works
+            // across Android/iOS without fragile custom URL-scheme hacks.
+            <a
+              href={story.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white text-black rounded-full px-4 py-2 text-sm font-semibold shadow-lg z-20"
+            >
+              <ExternalLink className="h-4 w-4" />
+              {story.link_label ? `Open in ${story.link_label}` : 'Open link'}
+            </a>
           )}
         </div>
 
