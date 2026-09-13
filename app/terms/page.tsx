@@ -88,6 +88,20 @@ We do not guarantee uninterrupted, error-free, or lag-free call or messaging qua
     body: `SociaLens relies on third-party service providers to operate — including, without limitation, cloud database/authentication hosting, real-time call infrastructure, AI language-model providers, push-notification delivery, and advertising networks. These providers have their own terms and privacy practices, which we do not control. SociaLens may display advertisements from third-party advertising networks; we do not control the specific content of every advertisement shown, and any interaction you have with an advertisement or advertiser is solely between you and that advertiser. Attempting to artificially generate ad views/clicks (including on your own account) is prohibited and may result in suspension.`,
   },
   {
+    title: `Personalization, Automated Ranking & Recommendations`,
+    body: `The order in which posts, Reels, Stories, and suggested accounts are shown to you is determined by an automated system that takes into account signals such as your past activity (what you view, watch, like, comment on, save, share, or mark "Not Interested"), how recently content was posted, and general engagement and quality signals — it is not a simple chronological list. You acknowledge and agree that this is how SociaLens operates and that we may change, tune, or replace this system at any time without notice.
+
+This system is designed to give newer or lesser-seen content a fair opportunity to be shown, in addition to already-popular content; we do not guarantee any particular level of reach, visibility, or engagement for any post, Reel, Story, or account, regardless of past performance.
+
+To operate this system, SociaLens records and aggregates behavioral signals about how you interact with content (see our Privacy Policy for what is collected and how it is retained). By using SociaLens, you consent to this processing as a core part of how the Platform functions.`,
+  },
+  {
+    title: `Public & External Sharing`,
+    body: `SociaLens allows a post, a Reel, or an Aperonix reply to be shared outside the Platform entirely (via the "Share outside SociaLens" option), which generates a public link that anyone can open and view without creating an account or signing in, regardless of that content's in-app privacy/audience setting at the time it was shared. Once you share something this way, or once someone else with permission to view your content shares it this way, you acknowledge that the content behind that specific link may be viewed by anyone who has or discovers the link, for as long as that link remains active, and that SociaLens is not responsible for further redistribution of a link once it exists.
+
+SociaLens also displays a status indicator (an "Active" or "Online" marker) on accounts, visible to others subject to your Status Privacy setting in Settings. You are responsible for configuring this setting according to your own preference; SociaLens is not liable for any inference someone else draws from your visible status.`,
+  },
+  {
     title: `Fees & Changes to the Service`,
     body: `SociaLens is currently provided free of charge. We may introduce paid features, subscriptions, or other charges in the future, with reasonable prior notice, and any such charges will be governed by additional terms presented to you at that time. We reserve the right to add, modify, suspend, or discontinue any feature or the Platform as a whole, at any time, with or without notice, and without any liability to you for doing so.`,
   },
