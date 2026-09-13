@@ -143,6 +143,11 @@ export function useActiveStories(userId?: string) {
 interface StoryAudienceInput {
   visibility?: StoryVisibility
   visibilitySelectedIds?: string[]
+  // Set when this story is created from something shared in from another
+  // app/website (see /share/handle) - shows an "Open in X" pill on the
+  // story that jumps back to that content.
+  linkUrl?: string | null
+  linkLabel?: string | null
 }
 
 interface CreateTextStoryInput extends StoryAudienceInput {
@@ -201,7 +206,7 @@ export function useCreateStory() {
   }
 
   const createTextStory = useMutation({
-    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds }: CreateTextStoryInput) => {
+    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds, linkUrl, linkLabel }: CreateTextStoryInput) => {
       const totalDuration = scenes.reduce((sum, s) => sum + s.duration, 0) || 5
       const first = scenes[0]
       // Legacy top-level music_* fields mirror whichever song plays first -
@@ -228,6 +233,8 @@ export function useCreateStory() {
         font_family: first?.fontFamily || globalFont || null,
         visibility: visibility || 'everyone',
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
+        link_url: linkUrl || null,
+        link_label: linkLabel || null,
       })
       if (error) throw error
     },
@@ -235,7 +242,7 @@ export function useCreateStory() {
   })
 
   const createMediaStory = useMutation({
-    mutationFn: async ({ userId, file, storyType, overlayText, overlayX, overlayY, musicUrl, musicTitle, musicArtist, musicArtworkUrl, durationSeconds, overlayTextColor, overlayFontFamily, visibility, visibilitySelectedIds }: CreateMediaStoryInput) => {
+    mutationFn: async ({ userId, file, storyType, overlayText, overlayX, overlayY, musicUrl, musicTitle, musicArtist, musicArtworkUrl, durationSeconds, overlayTextColor, overlayFontFamily, visibility, visibilitySelectedIds, linkUrl, linkLabel }: CreateMediaStoryInput) => {
       const fileToUpload = storyType === 'photo' ? await compressImageIfNeeded(file) : file
       const ext = fileToUpload.name.split('.').pop()
       const path = `${userId}/${Date.now()}.${ext}`
@@ -263,6 +270,8 @@ export function useCreateStory() {
         overlay_font_family: overlayFontFamily || null,
         visibility: visibility || 'everyone',
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
+        link_url: linkUrl || null,
+        link_label: linkLabel || null,
       })
       if (error) throw error
     },
@@ -273,7 +282,7 @@ export function useCreateStory() {
   // then saves one story row with a photo_scenes array - same overall shape
   // as the text story's scene system.
   const createPhotoStory = useMutation({
-    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds }: CreatePhotoStoryInput) => {
+    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds, linkUrl, linkLabel }: CreatePhotoStoryInput) => {
       const uploaded: PhotoScene[] = []
       for (const scene of scenes) {
         const fileToUpload = await compressImageIfNeeded(scene.file)
@@ -313,6 +322,8 @@ export function useCreateStory() {
         duration_seconds: totalDuration,
         visibility: visibility || 'everyone',
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
+        link_url: linkUrl || null,
+        link_label: linkLabel || null,
       })
       if (error) throw error
     },
@@ -323,7 +334,7 @@ export function useCreateStory() {
   // first, then saves one story row with a video_scenes array - same shape
   // as the photo story's scene system.
   const createVideoStory = useMutation({
-    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds }: CreateVideoStoryInput) => {
+    mutationFn: async ({ userId, scenes, globalMusic, globalFont, visibility, visibilitySelectedIds, linkUrl, linkLabel }: CreateVideoStoryInput) => {
       const uploaded: VideoScene[] = []
       for (const scene of scenes) {
         const ext = scene.file.name.split('.').pop()
@@ -361,6 +372,8 @@ export function useCreateStory() {
         duration_seconds: totalDuration,
         visibility: visibility || 'everyone',
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
+        link_url: linkUrl || null,
+        link_label: linkLabel || null,
       })
       if (error) throw error
     },
