@@ -120,7 +120,7 @@ export function SharedContentStoryModal({ userId, file, mediaType, linkUrl, link
       })
       onClose()
     } catch {
-      // surfaced via createMediaStory.isError below
+      // Surfaced via createMediaStory.isError below
     }
   }
 
