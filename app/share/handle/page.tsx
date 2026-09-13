@@ -13,7 +13,7 @@ import { SharedContentStoryModal } from '@/components/stories/SharedContentStory
 // sheet (see app/share/route.ts, which does the actual upload and hands
 // off to this page via redirect). This is the "what do you want to do
 // with this?" step - WhatsApp's equivalent is the "Add to Your Status"
-// option that shows up the same way.
+// Option that shows up the same way.
 function ShareHandleContent() {
   const router = useRouter()
   const params = useSearchParams()
