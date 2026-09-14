@@ -15,7 +15,7 @@ interface ReelsFeedProps {
   isLoadingMore?: boolean
 }
 
-export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore }: ReelsFeedProps) {
+export function ReelsFeed({ reels = [], isLoading, onLoadMore, hasMore, isLoadingMore }: ReelsFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,7 +45,7 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
     )
   }
 
-  if (reels.length === 0) {
+  if (!reels || reels.length === 0) {
     return (
       <div className="flex flex-col h-full items-center justify-center bg-black text-white gap-3">
         <div className="text-5xl">🎬</div>
@@ -55,7 +55,10 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
     )
   }
 
-  const items = useMemo(() => interleaveAds(reels, 3, 8), [reels])
+  const items = useMemo(() => {
+  if (!Array.isArray(reels) || reels.length === 0) return []
+  return interleaveAds(reels, 3, 8)
+}, [reels])
 
   return (
     <div
