@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils/helpers'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
-import { AdsterraBanner } from '@/components/shared/AdsterraBanner'
 import { CreatePostModal } from '@/components/shared/CreatePostModal'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 
@@ -72,13 +71,9 @@ export function Sidebar() {
             Settings
           </Link>
         </div>
-
-        <div className="mt-4">
-          <AdsterraBanner slotKey="sidebar_slot" />
-        </div>
       </aside>
 
       {showCreate && <CreatePostModal onClose={() => setShowCreate(false)} />}
     </>
   )
-} 
+}
