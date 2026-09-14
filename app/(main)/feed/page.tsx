@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
-import { AdsterraBanner } from '@/components/shared/AdsterraBanner'
+import { AdPostSlot } from '@/components/ads/AdPostSlot'
 import { StoriesBar } from '@/components/stories/StoriesBar'
 import { useFeedPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
+import { interleaveAds } from '@/lib/utils/adInsertion'
 
 export default function FeedPage() {
   const { user } = useUser()
@@ -17,6 +18,12 @@ export default function FeedPage() {
   const posts = data?.pages.flatMap(page => page.posts) ?? []
   const supabase = createClient()
   const queryClient = useQueryClient()
+
+  // Randomized gaps (3-8 posts apart) rather than a fixed "every 4th
+  // post" rhythm, so a sponsored post never falls into a noticeable
+  // pattern. Only recomputed when the actual post list changes, so ads
+  // don't jump around position on every unrelated re-render.
+  const items = useMemo(() => interleaveAds(posts, 3, 8), [posts])
 
   const handleDeletePost = async (postId: string) => {
     if (!user) return
@@ -34,6 +41,8 @@ export default function FeedPage() {
     queryClient.invalidateQueries({ queryKey: ['feed-posts'] })
   }
 
+  let lastRealPost: typeof posts[number] | null = null
+
   return (
     <div className="max-w-xl mx-auto">
       {/* Stories */}
@@ -50,8 +59,13 @@ export default function FeedPage() {
               <p className="text-sm mt-1">Follow people to fill your feed with their posts</p>
             </div>
           )
-          : posts.map((post, index) => {
-              const isFirstSuggested = post.is_suggested && !posts[index - 1]?.is_suggested
+          : items.map((item, index) => {
+              if (item === 'ad') {
+                return <AdPostSlot key={`ad-${index}`} />
+              }
+              const post = item
+              const isFirstSuggested = post.is_suggested && !lastRealPost?.is_suggested
+              lastRealPost = post
               return (
                 <div key={post.id}>
                   {isFirstSuggested && (
@@ -60,11 +74,6 @@ export default function FeedPage() {
                     </div>
                   )}
                   <PostCard post={post} onDelete={handleDeletePost} />
-                  {(index + 1) % 4 === 0 && (
-                    <div className="border-y bg-muted/20 py-1">
-                      <AdsterraBanner slotKey={`feed_${index}`} />
-                    </div>
-                  )}
                 </div>
               )
             })
