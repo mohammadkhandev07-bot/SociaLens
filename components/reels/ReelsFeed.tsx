@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { ReelCard } from './ReelCard'
 import { AdReelSlot } from '@/components/ads/AdReelSlot'
-import { interleaveAds } from '@/lib/utils/adInsertion'
+import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
@@ -37,6 +37,13 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
     setActiveIndex(newIndex)
   }, [])
 
+  // Must run on every render, before any early return below - a hook
+  // called only sometimes (e.g. skipped while isLoading) changes how many
+  // hooks React sees between renders, which is exactly what was crashing
+  // this page (React error #310, "rendered more hooks than previous
+  // render").
+  const items = useMemo(() => interleaveAds(dedupeById(reels), 3, 8), [reels])
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-black">
@@ -54,8 +61,6 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
       </div>
     )
   }
-
-  const items = useMemo(() => interleaveAds(reels, 3, 8), [reels])
 
   return (
     <div
