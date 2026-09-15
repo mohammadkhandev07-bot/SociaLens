@@ -10,7 +10,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
-import { interleaveAds } from '@/lib/utils/adInsertion'
+import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
 
 export default function FeedPage() {
   const { user } = useUser()
@@ -22,8 +22,8 @@ export default function FeedPage() {
   // Randomized gaps (3-8 posts apart) rather than a fixed "every 4th
   // post" rhythm, so a sponsored post never falls into a noticeable
   // pattern. Only recomputed when the actual post list changes, so ads
-  // Don't jump around position on every unrelated re-render.
-  const items = useMemo(() => interleaveAds(posts, 3, 8), [posts])
+  // don't jump around position on every unrelated re-render.
+  const items = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
 
   const handleDeletePost = async (postId: string) => {
     if (!user) return
