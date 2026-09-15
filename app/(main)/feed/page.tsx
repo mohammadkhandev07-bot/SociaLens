@@ -22,7 +22,7 @@ export default function FeedPage() {
   // Randomized gaps (3-8 posts apart) rather than a fixed "every 4th
   // post" rhythm, so a sponsored post never falls into a noticeable
   // pattern. Only recomputed when the actual post list changes, so ads
-  // don't jump around position on every unrelated re-render.
+  // Don't jump around position on every unrelated re-render.
   const items = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
 
   const handleDeletePost = async (postId: string) => {
