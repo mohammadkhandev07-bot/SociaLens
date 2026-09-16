@@ -23,14 +23,18 @@ async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   if (!posts.length || !userId) return posts
 
   const postIds = posts.map(p => p.id)
-  const { data: likes } = await supabase
-    .from('likes')
-    .select('post_id')
-    .eq('user_id', userId)
-    .in('post_id', postIds)
+  // Batched together (2 queries total for the whole page) instead of one
+  // query per post - each PostCard/ReelCard used to run its own separate
+  // "did I repost this?" check via useIsReposted, which meant a feed of
+  // 10 posts fired 10 extra requests just for that one flag.
+  const [{ data: likes }, { data: reposts }] = await Promise.all([
+    supabase.from('likes').select('post_id').eq('user_id', userId).in('post_id', postIds),
+    supabase.from('reposts').select('post_id').eq('user_id', userId).in('post_id', postIds),
+  ])
 
   const likedSet = new Set(likes?.map(l => l.post_id) ?? [])
-  return posts.map(p => ({ ...p, is_liked: likedSet.has(p.id) }))
+  const repostedSet = new Set(reposts?.map(r => r.post_id) ?? [])
+  return posts.map(p => ({ ...p, is_liked: likedSet.has(p.id), is_reposted: repostedSet.has(p.id) }))
 }
 
 export function useFeedPosts(userId?: string) {
