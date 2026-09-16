@@ -15,6 +15,8 @@ interface InfiniteScrollSentinelProps {
 // worth of posts up front.
 export function InfiniteScrollSentinel({ onIntersect, hasMore, isLoading }: InfiniteScrollSentinelProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const isLoadingRef = useRef(isLoading)
+  isLoadingRef.current = isLoading
 
   useEffect(() => {
     if (!hasMore) return
@@ -22,7 +24,12 @@ export function InfiniteScrollSentinel({ onIntersect, hasMore, isLoading }: Infi
     if (!el) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) onIntersect()
+        // Read the latest value via the ref, not the isLoading captured
+        // when this effect last ran - a fast scroll can otherwise fire
+        // this callback again before the "loading" state has actually
+        // re-rendered this component, triggering a second fetch for the
+        // same next page.
+        if (entries[0]?.isIntersecting && !isLoadingRef.current) onIntersect()
       },
       { rootMargin: '600px' } // starts loading well before it's actually visible, so scrolling never outruns it
     )
