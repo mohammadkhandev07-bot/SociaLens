@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 
-export function useIsReposted(postId: string, userId?: string) {
+export function useIsReposted(postId: string, userId?: string, prefetched?: boolean) {
   const supabase = createClient()
 
   return useQuery({
@@ -18,7 +18,14 @@ export function useIsReposted(postId: string, userId?: string) {
         .maybeSingle()
       return !!data
     },
-    enabled: !!userId && !!postId,
+    // If the page that rendered this card already batch-fetched repost
+    // status for its whole list (see fetchPostsWithLikes), skip the
+    // per-card network request entirely and just trust that value -
+    // this is what actually avoids the N+1 query pattern. Any caller
+    // that doesn't have a prefetched value (existing behavior) still
+    // gets its own query exactly as before.
+    initialData: prefetched,
+    enabled: prefetched === undefined && !!userId && !!postId,
   })
 }
 
