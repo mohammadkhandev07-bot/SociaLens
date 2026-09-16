@@ -123,7 +123,7 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
     const pct = (v.currentTime / v.duration) * 100
     // loop="true" seeks back to 0 and keeps playing without ever firing a
     // real 'ended' event, so a rewatch/loop shows up here instead - the
-    // progress bar snapping from near the end back to near zero.
+    // Progress bar snapping from near the end back to near zero.
     if (progress > 90 && pct < 10) {
       if (!hasTrackedCompletionRef.current) {
         hasTrackedCompletionRef.current = true
