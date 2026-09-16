@@ -2,7 +2,7 @@
 -- SociaLens - Performance indexes
 -- Safe to run more than once. Every index here is CREATE INDEX
 -- IF NOT EXISTS - purely additive, never drops or alters anything,
--- and doesn't change any query's results, only how fast it runs.
+-- And doesn't change any query's results, only how fast it runs.
 -- ===========================================================
 
 -- posts: profile grids and admin "posts by user" views filter directly
