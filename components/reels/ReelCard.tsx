@@ -47,7 +47,7 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
   const loopCountRef = useRef(0)
   const hasTrackedCompletionRef = useRef(false)
 
-  const { data: isReposted = false } = useIsReposted(post.id, user?.id)
+  const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
 
   const flushWatchTime = () => {
