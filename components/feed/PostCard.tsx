@@ -41,7 +41,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hasCountedViewRef = useRef(false)
 
-  const { data: isReposted = false } = useIsReposted(post.id, user?.id)
+  const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
 
   useEffect(() => {
