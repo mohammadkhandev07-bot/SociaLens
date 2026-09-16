@@ -1,16 +1,25 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { useActiveStories } from '@/lib/hooks/useStories'
 import { useUser } from '@/lib/hooks/useUser'
-import { CreateStoryModal } from './CreateStoryModal'
-import { StoryViewer } from './StoryViewer'
 import { AdStorySlot } from '@/components/ads/AdStorySlot'
 import { AdStoryViewer } from '@/components/ads/AdStoryViewer'
 import { interleaveAds } from '@/lib/utils/adInsertion'
+
+// StoriesBar renders on the Feed page, which is the very first thing
+// most people see. CreateStoryModal alone transitively pulls in the
+// Photo/Video/Text story editors (music picker, font picker, filters -
+// well over 2,000 lines combined) and StoryViewer is another ~800 -
+// none of that should be part of Feed's initial bundle when most visits
+// never open either of them. Loaded on demand instead, the moment
+// someone actually taps "Your Story" or a story ring.
+const CreateStoryModal = dynamic(() => import('./CreateStoryModal').then(m => m.CreateStoryModal), { ssr: false })
+const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewer), { ssr: false })
 
 export function StoriesBar() {
   const { user, profile } = useUser()
