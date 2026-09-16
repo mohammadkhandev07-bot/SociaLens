@@ -56,7 +56,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
       // those should surface as an error. The reposts side-query is
       // supplementary (it only adds the "reposted" badge posts to the
       // grid), so a hiccup there should never hide the person's actual
-      // Own posts/reels - it just quietly contributes nothing this time.
+      // own posts/reels - it just quietly contributes nothing this time.
       if (ownError) throw ownError
       if (repostError) console.error('profile reposts fetch failed, showing own posts only', repostError)
 
@@ -134,7 +134,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
                 <button key={post.id} onClick={() => setSelectedPost(post)} className="relative aspect-square bg-muted overflow-hidden group">
                   {post.reposted_by && post.reposted_by.length > 0 && <div className="absolute top-1.5 right-1.5 z-10 bg-black/50 rounded-full p-1"><Repeat2 className="h-3 w-3 text-white" /></div>}
                   {post.media_url ? (
-                    <Image src={post.media_url} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-200" />
+                    <Image src={post.media_url} alt="" fill sizes="33vw" className="object-cover group-hover:scale-105 transition-transform duration-200" />
                   ) : (
                     <div className="flex items-center justify-center h-full p-2 bg-gradient-to-br from-pink-500/10 to-purple-500/10"><PostCaption content={post.content ?? ''} variant="titleOnly" titleClassName="text-xs text-center text-muted-foreground line-clamp-4" /></div>
                   )}
