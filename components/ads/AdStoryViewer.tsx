@@ -12,7 +12,7 @@ interface AdStoryViewerProps {
   onClose: () => void
   /** Only passed when this ad story is reached by finishing (or tapping
    *  forward past) the very last real story - lets a left-side tap take
-   *  the person back into that real story instead of just closing,
+   *  The person back into that real story instead of just closing,
    *  same as tapping back on any other story in the row. */
   onGoBack?: () => void
 }
