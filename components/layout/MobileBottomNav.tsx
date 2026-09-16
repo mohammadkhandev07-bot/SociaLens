@@ -12,7 +12,7 @@ import { getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
 
 // See Sidebar.tsx for why this is dynamically imported instead of a
-// normal top-level import - this component renders on every page too.
+// Normal top-level import - this component renders on every page too.
 const CreatePostModal = dynamic(() => import('@/components/shared/CreatePostModal').then(m => m.CreatePostModal), { ssr: false })
 
 // Left-side nav items (before the Create button)
