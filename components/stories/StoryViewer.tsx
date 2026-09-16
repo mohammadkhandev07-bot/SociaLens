@@ -36,8 +36,17 @@ import type { TextScene, PhotoScene, VideoScene } from '@/lib/types/database.typ
 interface StoryViewerProps {
   groups: StoryGroup[]
   startGroupIndex: number
+  /** Which story within the starting group to open on - defaults to the
+   *  first one. Used when re-entering at the end of the list (e.g.
+   *  coming back from the trailing sponsored story), so the person lands
+   *  back on the exact story they left rather than that user's first. */
+  startStoryIndex?: number
   currentUserId?: string
   onClose: () => void
+  /** Called instead of onClose when advancing (auto or via a next-tap)
+   *  past the very last story of the very last group - lets the caller
+   *  chain into the trailing sponsored story instead of just closing. */
+  onReachEnd?: () => void
 }
 
 // Figures out which scene should be showing right now, given how far into
@@ -54,11 +63,11 @@ function getActiveScene<T extends { duration: number }>(scenes: T[] | null, elap
   return scenes[scenes.length - 1]
 }
 
-export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }: StoryViewerProps) {
+export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, currentUserId, onClose, onReachEnd }: StoryViewerProps) {
   const { profile } = useUser()
   const router = useRouter()
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
-  const [storyIndex, setStoryIndex] = useState(0)
+  const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
   const [videoSceneIndex, setVideoSceneIndex] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -133,6 +142,8 @@ export function StoryViewer({ groups, startGroupIndex, currentUserId, onClose }:
     } else if (groupIndex < groups.length - 1) {
       setGroupIndex((g) => g + 1)
       setStoryIndex(0)
+    } else if (onReachEnd) {
+      onReachEnd()
     } else {
       onClose()
     }
