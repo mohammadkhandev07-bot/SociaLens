@@ -26,7 +26,14 @@ export function StoriesBar() {
   const { data: groups = [] } = useActiveStories(user?.id)
   const [showCreate, setShowCreate] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
   const [showAdStory, setShowAdStory] = useState(false)
+
+  // Whether the ad story we're showing was reached by finishing (or
+  // tapping past) the very last real story, rather than by tapping the
+  // sponsored ring directly - only then does a back-tap on it make sense
+  // (there's a real story to return to).
+  const [adFromChain, setAdFromChain] = useState(false)
 
   const myGroup = groups.find((g) => g.userId === user?.id)
   const otherGroups = useMemo(() => groups.filter((g) => g.userId !== user?.id), [groups, user?.id])
@@ -41,6 +48,26 @@ export function StoriesBar() {
     return withRandomAds
   }, [otherGroups])
 
+  // Finishing (or tapping past) the very last story of the very last
+  // group now chains into the trailing sponsored story instead of just
+  // closing the viewer - so people actually reach it in the normal
+  // scroll-through-stories flow, not only by tapping the ring directly.
+  const handleReachEndOfStories = () => {
+    setViewerIndex(null)
+    setAdFromChain(true)
+    setShowAdStory(true)
+  }
+
+  // Tapping back (left side) on a chained-in ad story returns to exactly
+  // where the person left off - the last story of the last group.
+  const handleAdGoBack = () => {
+    setShowAdStory(false)
+    setAdFromChain(false)
+    const lastGroup = groups[groups.length - 1]
+    setViewerIndex(groups.length - 1)
+    setViewerStoryIndex(lastGroup ? lastGroup.stories.length - 1 : 0)
+  }
+
   if (!profile) return null
 
   return (
@@ -48,7 +75,14 @@ export function StoriesBar() {
       <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
         {/* Your Story bubble */}
         <button
-          onClick={() => (myGroup ? setViewerIndex(groups.indexOf(myGroup)) : setShowCreate(true))}
+          onClick={() => {
+            if (myGroup) {
+              setViewerStoryIndex(0)
+              setViewerIndex(groups.indexOf(myGroup))
+            } else {
+              setShowCreate(true)
+            }
+          }}
           className="flex flex-col items-center gap-1 shrink-0 w-16"
         >
           <div className={`relative h-16 w-16 rounded-full flex items-center justify-center ${myGroup ? 'bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]' : ''}`}>
@@ -74,7 +108,10 @@ export function StoriesBar() {
           return (
             <button
               key={item.userId}
-              onClick={() => setViewerIndex(groups.indexOf(item))}
+              onClick={() => {
+                setViewerStoryIndex(0)
+                setViewerIndex(groups.indexOf(item))
+              }}
               className="flex flex-col items-center gap-1 shrink-0 w-16"
             >
               <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
@@ -95,12 +132,19 @@ export function StoriesBar() {
         <StoryViewer
           groups={groups}
           startGroupIndex={viewerIndex}
+          startStoryIndex={viewerStoryIndex}
           currentUserId={user?.id}
           onClose={() => setViewerIndex(null)}
+          onReachEnd={handleReachEndOfStories}
         />
       )}
 
-      {showAdStory && <AdStoryViewer onClose={() => setShowAdStory(false)} />}
+      {showAdStory && (
+        <AdStoryViewer
+          onClose={() => { setShowAdStory(false); setAdFromChain(false) }}
+          onGoBack={adFromChain ? handleAdGoBack : undefined}
+        />
+      )}
     </div>
   )
 }
