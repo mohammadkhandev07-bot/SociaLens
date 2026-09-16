@@ -22,7 +22,7 @@ export function useIsReposted(postId: string, userId?: string, prefetched?: bool
     // status for its whole list (see fetchPostsWithLikes), skip the
     // per-card network request entirely and just trust that value -
     // this is what actually avoids the N+1 query pattern. Any caller
-    // that doesn't have a prefetched value (existing behavior) still
+    // That doesn't have a prefetched value (existing behavior) still
     // gets its own query exactly as before.
     initialData: prefetched,
     enabled: prefetched === undefined && !!userId && !!postId,
