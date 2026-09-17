@@ -6,8 +6,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // to rotate, so it's baked in here instead of making you set it up in
 // environment variables. (The public half is also hardcoded in
 // usePushSubscription.ts - both halves have to match.)
-const VAPID_PUBLIC_KEY = 'BGI4kJnzbedMSJ9-cgol7_P8MnNzsyXzGjSG6QZwSZtKX1qCXvrcoxuXvH9FwDNrW0-rjpf8aZWBMcGn9EYrT1k'
-const VAPID_PRIVATE_KEY = 'NXrDfGWfCOQQWysEldmbeAB3hdepebohRluzEXFf1fQ'
+// Generated once for this project - a VAPID key pair just identifies "this
+// server" to the push service, it isn't a per-deployment secret you need
+// to rotate. Reads from an env var if one's set (recommended once this
+// repo is public/shared, so the private half isn't sitting in source
+// control) and falls back to the original baked-in pair otherwise, so
+// nothing breaks if you don't set one. (The public half is also in
+// usePushSubscription.ts - both halves have to match.)
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BGI4kJnzbedMSJ9-cgol7_P8MnNzsyXzGjSG6QZwSZtKX1qCXvrcoxuXvH9FwDNrW0-rjpf8aZWBMcGn9EYrT1k'
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'NXrDfGWfCOQQWysEldmbeAB3hdepebohRluzEXFf1fQ'
 
 let configured = false
 function ensureConfigured() {
