@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useCallEngine, peerAvatar, type CallType } from '@/lib/hooks/useCall'
 import { useCallSettings } from '@/lib/hooks/useChatSettings'
@@ -47,6 +47,34 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const { data: callSettings } = useCallSettings(user?.id)
   usePushSubscription(user?.id)
   const [bannerError, setBannerError] = useState<string | null>(null)
+
+  // Tapping "Accept" on the OS call notification (see public/sw.js) lands
+  // here with ?incomingCall=<id> in the URL - including on a cold start,
+  // where SociaLens was fully closed and this is the very first render.
+  // Read it once, then wait for that same call to actually show up as
+  // ringing (via the realtime listener/fallback poll in useCallEngine)
+  // before accepting it, since it may not have arrived yet on this first
+  // render. Stripped from the address bar immediately so refreshing or
+  // navigating back doesn't re-trigger it.
+  const pendingAcceptCallId = useRef<string | null>(null)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const incomingCall = params.get('incomingCall')
+    if (!incomingCall) return
+    pendingAcceptCallId.current = incomingCall
+    params.delete('incomingCall')
+    const rest = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''))
+  }, [])
+
+  useEffect(() => {
+    if (!pendingAcceptCallId.current) return
+    if (engine.phase === 'incoming-ringing' && engine.call?.id === pendingAcceptCallId.current) {
+      pendingAcceptCallId.current = null
+      engine.acceptIncoming()
+    }
+  }, [engine.phase, engine.call?.id, engine.acceptIncoming])
 
   // Whenever the call engine reports an error (permission denied, DB
   // Insert failed, etc.) surface it here, auto-dismissing after a bit.
