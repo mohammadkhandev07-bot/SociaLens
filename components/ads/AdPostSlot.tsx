@@ -19,7 +19,7 @@ import { getAdState, toggleAdLike, toggleAdSave, addAdComment, type LocalAdComme
 // sees a "comment" left on it. The only tell, by design, is the small
 // "Sponsored" label where a timestamp would normally sit - same as how
 // Instagram labels a sponsored post while keeping it just as tappable
-// as any other. Share is left out on purpose: there's nothing real
+// As any other. Share is left out on purpose: there's nothing real
 // behind the ad to forward to someone else.
 export function AdPostSlot() {
   const generatedId = useId()
