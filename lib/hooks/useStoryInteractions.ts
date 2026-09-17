@@ -3,11 +3,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types/database.types'
+import { QUICK_REACTION_EMOJIS } from '@/lib/utils/reactionEmojis'
 
 // Quick-pick mood emojis shown directly on the React button, one tap each -
-// same idea as Instagram/Facebook's reaction bar. "More" opens the full
-// EmojiPicker grid for anything outside this set.
-export const STORY_REACTION_EMOJIS = ['😍', '😂', '😮', '😢', '🔥', '👏', '😡', '🙏']
+// same set used for comment reactions elsewhere in the app, for a
+// consistent feel across the whole app.
+export const STORY_REACTION_EMOJIS = QUICK_REACTION_EMOJIS
 
 // ------------------------------------------------------------------
 // Likes
