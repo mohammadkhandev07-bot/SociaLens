@@ -577,12 +577,12 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         {/* Bottom action bar */}
         <div className="absolute bottom-0 left-0 right-0 z-30 px-3 pb-4 pt-3 bg-gradient-to-t from-black/60 to-transparent">
           {showReactionBar && (
-            <div className="flex justify-center gap-2.5 mb-3 bg-black/40 backdrop-blur-sm rounded-full py-2 px-3 mx-auto w-fit">
+            <div className="flex items-center gap-2.5 mb-3 bg-black/40 backdrop-blur-sm rounded-full py-2 px-3 mx-auto max-w-[85vw] overflow-x-auto flex-nowrap scrollbar-hide">
               {STORY_REACTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => handleReact(emoji)}
-                  className={cn('text-2xl transition-transform hover:scale-125', myReaction === emoji && 'scale-125')}
+                  className={cn('text-2xl shrink-0 transition-transform hover:scale-125', myReaction === emoji && 'scale-125')}
                 >
                   {emoji}
                 </button>
