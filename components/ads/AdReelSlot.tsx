@@ -70,7 +70,7 @@ export function AdReelSlot({ isActive, isMuted, onToggleMute }: AdReelSlotProps)
   return (
     <div className="relative w-full h-full flex-shrink-0 bg-black snap-start snap-always overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center">
-        {isActive && <NativeAdUnit style={{ height: '100%' }} background="#000000" />}
+        {isActive && <NativeAdUnit background="#000000" />}
       </div>
 
       <button onClick={onToggleMute} className="absolute top-3 right-3 z-20 h-9 w-9 rounded-full bg-black/30 flex items-center justify-center">
