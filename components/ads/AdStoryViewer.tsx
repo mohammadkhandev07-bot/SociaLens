@@ -7,18 +7,18 @@ import { NativeAdUnit } from './NativeAdUnit'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl, cn } from '@/lib/utils/helpers'
 import { getAdState, toggleAdLike, setAdReaction, addAdComment, type LocalAdComment } from '@/lib/utils/adInteractions'
+import { QUICK_REACTION_EMOJIS } from '@/lib/utils/reactionEmojis'
 
 interface AdStoryViewerProps {
   onClose: () => void
   /** Only passed when this ad story is reached by finishing (or tapping
    *  forward past) the very last real story - lets a left-side tap take
-   *  The person back into that real story instead of just closing,
+   *  the person back into that real story instead of just closing,
    *  same as tapping back on any other story in the row. */
   onGoBack?: () => void
 }
 
 const DURATION_MS = 6000
-const REACTION_EMOJIS = ['😍', '😂', '😮', '😢', '🔥', '👏', '😡', '🙏']
 
 // Deliberately a separate, simple component rather than reusing the real
 // StoryViewer - that component is built entirely around real story rows
@@ -116,7 +116,7 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <NativeAdUnit style={{ height: '100%' }} background="#000000" />
+        <NativeAdUnit background="#000000" />
       </div>
 
       {/* Tap zones for prev/next, kept short of the bottom action bar -
@@ -134,12 +134,12 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
           StoryViewer's non-owner action row. */}
       <div className="absolute bottom-0 left-0 right-0 z-30 px-3 pb-4 pt-3 bg-gradient-to-t from-black/60 to-transparent">
         {showReactionBar && (
-          <div className="flex justify-center gap-2.5 mb-3 bg-black/40 backdrop-blur-sm rounded-full py-2 px-3 mx-auto w-fit">
-            {REACTION_EMOJIS.map((emoji) => (
+          <div className="flex items-center gap-2.5 mb-3 bg-black/40 backdrop-blur-sm rounded-full py-2 px-3 mx-auto max-w-[85vw] overflow-x-auto flex-nowrap scrollbar-hide">
+            {QUICK_REACTION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => handleReact(emoji)}
-                className={cn('text-2xl transition-transform hover:scale-125', reaction === emoji && 'scale-125')}
+                className={cn('text-2xl shrink-0 transition-transform hover:scale-125', reaction === emoji && 'scale-125')}
               >
                 {emoji}
               </button>
