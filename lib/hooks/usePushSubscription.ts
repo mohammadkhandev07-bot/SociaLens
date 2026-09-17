@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 
 // Same public key as lib/server/push.ts - safe to have in client code,
 // that's what the "public" half of a VAPID key pair is for.
-const VAPID_PUBLIC_KEY = 'BGI4kJnzbedMSJ9-cgol7_P8MnNzsyXzGjSG6QZwSZtKX1qCXvrcoxuXvH9FwDNrW0-rjpf8aZWBMcGn9EYrT1k'
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BGI4kJnzbedMSJ9-cgol7_P8MnNzsyXzGjSG6QZwSZtKX1qCXvrcoxuXvH9FwDNrW0-rjpf8aZWBMcGn9EYrT1k'
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
