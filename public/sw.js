@@ -124,17 +124,25 @@ self.addEventListener('notificationclick', e => {
     return
   }
 
-  const targetUrl = url || (chatId ? `/chat/${chatId}` : '/feed')
+  let targetUrl = url || (chatId ? `/chat/${chatId}` : '/feed')
+  // Tapping "Accept" (or just the notification body) needs to land on a
+  // call that's actually accepted, not just a chat page the person still
+  // has to tap Accept on again - especially when SociaLens was fully
+  // closed, where clients.openWindow() below opens a brand-new page load
+  // and a postMessage sent to it would arrive before that page has even
+  // registered a listener. Encoding the callId in the URL instead survives
+  // a full reload: the app reads it once it's up, waits until that same
+  // call shows up as ringing, and accepts it automatically.
+  if (kind === 'call' && callId) {
+    const sep = targetUrl.includes('?') ? '&' : '?'
+    targetUrl = `${targetUrl}${sep}incomingCall=${encodeURIComponent(callId)}`
+  }
   e.waitUntil(
     clients.matchAll({ type: 'window' }).then(list => {
       for (const c of list) {
         if ('focus' in c) {
           c.navigate(targetUrl)
           c.focus()
-          // Let the already-open app know a call notification was tapped,
-          // So it can also start ringing in-app with the chosen ringtone -
-          // the OS notification sound plays regardless, this is on top of it.
-          if (kind === 'call') c.postMessage({ type: 'CALL_NOTIFICATION_OPENED', callId })
           return
         }
       }
