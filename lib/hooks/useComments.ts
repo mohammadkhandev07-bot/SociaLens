@@ -4,12 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { EnrichedComment } from '@/lib/types/database.types'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
+import { QUICK_REACTION_EMOJIS } from '@/lib/utils/reactionEmojis'
 
 export type CommentTarget = 'post' | 'story'
 
 // Quick-pick reaction emojis shown right on each comment - same set used
 // for story reactions elsewhere in the app, for a consistent feel.
-export const COMMENT_REACTION_EMOJIS = ['😍', '😂', '😮', '😢', '🔥', '👏', '😡', '🙏']
+export const COMMENT_REACTION_EMOJIS = QUICK_REACTION_EMOJIS
 
 function tableConfig(target: CommentTarget) {
   return target === 'story'
