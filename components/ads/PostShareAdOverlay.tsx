@@ -12,7 +12,7 @@ export function PostShareAdOverlay() {
   return (
     <div className="fixed inset-0 bg-background z-[300] flex flex-col items-center justify-center gap-4 px-6">
       <p className="text-xs font-medium text-muted-foreground tracking-wide">Sponsored</p>
-      <div className="w-full max-w-sm rounded-2xl overflow-hidden border bg-card" style={{ minHeight: 280 }}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden border bg-card">
         <NativeAdUnit background="var(--card, #fff)" />
       </div>
       <p className="text-sm text-muted-foreground">Posting...</p>
