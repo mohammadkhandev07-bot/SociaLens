@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { COMMENT_REACTION_EMOJIS } from '@/lib/hooks/useComments'
 
 interface CommentReactionPickerProps {
@@ -10,17 +11,26 @@ interface CommentReactionPickerProps {
   onClose: () => void
 }
 
-const PICKER_WIDTH = 168
-const PICKER_HEIGHT = 84
+const PICKER_WIDTH = 216
+const PICKER_MAX_HEIGHT = 176 // ~4 rows visible; the rest scrolls
+const PICKER_HEIGHT = PICKER_MAX_HEIGHT + 16 // + the panel's own padding, for the above/below flip check
 
-// A tiny quick-pick emoji grid for reacting to a comment. Positioned with
+// A quick-pick emoji grid for reacting to a comment. Positioned with
 // `fixed` + coordinates read straight off the React button (not `absolute`
 // inside the comment), so it's never clipped by a comment list's own
-// Scroll container - which is exactly what happened when this opened on
-// a comment sitting near the top of a scrollable panel (e.g. the first
-// comment in a story's comments sheet): it flips to open downward
-// instead of upward whenever there isn't room above, and stays clear of
-// both screen edges horizontally.
+// scroll container - it flips to open downward instead of upward
+// whenever there isn't room above, and stays clear of both screen edges
+// horizontally.
+//
+// Rendered through a portal straight into `document.body` rather than in
+// place - a plain `position: fixed` child stops being positioned relative
+// to the viewport the moment any ancestor has a `transform`, `filter`, or
+// `backdrop-filter` on it (that ancestor becomes its new containing block
+// instead), which is exactly what was happening inside the Reels comments
+// panel (it's `backdrop-blur-md`): the popup was still opening, just
+// positioned/clipped against the wrong box, so tapping "React" there
+// looked like it did nothing. Portaling escapes that entirely, so this
+// now works the same everywhere it's used.
 export function CommentReactionPicker({ anchorRef, onSelect, onClose }: CommentReactionPickerProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -54,13 +64,13 @@ export function CommentReactionPicker({ anchorRef, onSelect, onClose }: CommentR
     }
   }, [onClose, anchorRef])
 
-  if (!pos) return null
+  if (!pos || typeof document === 'undefined') return null
 
-  return (
+  return createPortal(
     <div
       ref={ref}
-      style={{ position: 'fixed', top: pos.top, left: pos.left, width: PICKER_WIDTH }}
-      className="z-[200] grid grid-cols-4 gap-0.5 bg-card border rounded-2xl shadow-lg p-1.5"
+      style={{ position: 'fixed', top: pos.top, left: pos.left, width: PICKER_WIDTH, maxHeight: PICKER_MAX_HEIGHT }}
+      className="z-[200] grid grid-cols-6 gap-0.5 bg-card border rounded-2xl shadow-lg p-1.5 overflow-y-auto scrollbar-hide"
     >
       {COMMENT_REACTION_EMOJIS.map((emoji) => (
         <button
@@ -72,6 +82,7 @@ export function CommentReactionPicker({ anchorRef, onSelect, onClose }: CommentR
           {emoji}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body
   )
 }
