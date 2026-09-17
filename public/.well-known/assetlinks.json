@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.socialens.app",
+      "sha256_cert_fingerprints": [
+        "AD:86:9E:06:AC:17:03:2F:30:26:0A:BD:BA:5C:EF:7F:D3:CB:69:28:E2:38:E8:BE:DA:17:D1:0A:2D:DD:C0:EB"
+      ]
+    }
+  }
+]
