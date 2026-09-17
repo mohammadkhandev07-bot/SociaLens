@@ -9,7 +9,7 @@ import { getAvatarUrl, formatCount } from '@/lib/utils/helpers'
 import { getAdState, toggleAdLike, toggleAdSave, addAdComment, type LocalAdComment } from '@/lib/utils/adInteractions'
 
 // Sits in the Home feed / Explore grid at a randomized position (see
-// Lib/utils/adInsertion.ts) styled exactly like a real PostCard: same
+// lib/utils/adInsertion.ts) styled exactly like a real PostCard: same
 // header row, same media area, same action-icon row, same "N likes"
 // line and inline comment box underneath. Unlike a real post though,
 // liking/commenting/saving here is entirely local - it reads and writes
@@ -76,7 +76,7 @@ export function AdPostSlot() {
         </div>
       </div>
 
-      <div className="relative w-full bg-muted" style={{ minHeight: 280 }}>
+      <div className="relative w-full bg-muted">
         <NativeAdUnit background="var(--card, #fff)" />
       </div>
 
