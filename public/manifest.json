@@ -26,22 +26,7 @@
     { "src": "/icons/maskable-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icons/maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/feed.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "SociaLens Feed"
-    },
-    {
-      "src": "/screenshots/reels.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "SociaLens Reels"
-    }
-  ],
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "Home Feed",
