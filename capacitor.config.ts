@@ -9,7 +9,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // both problems the TWA build had - there's no address bar to show
 // (this is a real native Activity, not a browser tab), and there's no
 // dependency on the Chrome app being installed/updated on the device
-// (the WebView component ships with Android itself).
+// (The WebView component ships with Android itself).
 //
 // Before running `npx cap sync android`, change `url` below to your
 // production domain if that ever changes from the current Vercel one.
