@@ -64,5 +64,5 @@ handles that the moment someone opens the app while logged in.
 small Kotlin file that turns an incoming "call" push into the same
 loud/ringing notification with Accept/Decline buttons that the website's
 service worker already shows browser users. That file comes in the next
-step of this build - this document only covers the Firebase account setup
+step of this build - This document only covers the Firebase account setup
 itself.
