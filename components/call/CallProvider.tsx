@@ -34,7 +34,7 @@ export function useCallContext() {
  * Mounted once near the root (see ResponsiveLayout) so a call can ring in
  * from anywhere in the app, not just the chat page. Renders the incoming
  * call screen, the active call screen, and a self-contained error banner
- * As global overlays.
+ * as global overlays.
  *
  * The error banner is driven directly by this component's own state
  * (bannerError below) rather than routing through the separate Toast
@@ -58,14 +58,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // before accepting it, since it may not have arrived yet on this first
   // render. Stripped from the address bar immediately so refreshing or
   // navigating back doesn't re-trigger it.
+  //
+  // The native Android app's Decline button (see CallMessagingService.kt)
+  // uses the same trick with ?declineCall=<id> instead - the notification
+  // there can't safely call /api/calls/decline on its own (that route
+  // needs the person's real logged-in session, which only this WebView
+  // actually has), so it opens the app long enough for this same code
+  // path to make that authenticated call for it.
   const pendingAcceptCallId = useRef<string | null>(null)
+  const pendingDeclineCallId = useRef<string | null>(null)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const incomingCall = params.get('incomingCall')
-    if (!incomingCall) return
-    pendingAcceptCallId.current = incomingCall
+    const declineCall = params.get('declineCall')
+    if (!incomingCall && !declineCall) return
+    if (incomingCall) pendingAcceptCallId.current = incomingCall
+    if (declineCall) pendingDeclineCallId.current = declineCall
     params.delete('incomingCall')
+    params.delete('declineCall')
     const rest = params.toString()
     window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''))
   }, [])
@@ -77,6 +88,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       engine.acceptIncoming()
     }
   }, [engine.phase, engine.call?.id, engine.acceptIncoming])
+
+  useEffect(() => {
+    if (!pendingDeclineCallId.current) return
+    if (engine.phase === 'incoming-ringing' && engine.call?.id === pendingDeclineCallId.current) {
+      pendingDeclineCallId.current = null
+      engine.rejectIncoming()
+    }
+  }, [engine.phase, engine.call?.id, engine.rejectIncoming])
 
   // Whenever the call engine reports an error (permission denied, DB
   // Insert failed, etc.) surface it here, auto-dismissing after a bit.
