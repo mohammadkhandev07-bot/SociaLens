@@ -34,7 +34,7 @@ export function useCallContext() {
  * Mounted once near the root (see ResponsiveLayout) so a call can ring in
  * from anywhere in the app, not just the chat page. Renders the incoming
  * call screen, the active call screen, and a self-contained error banner
- * as global overlays.
+ * As global overlays.
  *
  * The error banner is driven directly by this component's own state
  * (bannerError below) rather than routing through the separate Toast
