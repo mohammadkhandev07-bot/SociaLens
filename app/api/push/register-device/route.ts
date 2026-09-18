@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 // Mirrors app/api/push/subscribe/route.ts, but for the native Android
 // app's FCM token instead of a browser's Web Push subscription - see
-// supabase-migration-device-push-tokens.sql for the table this writes to.
+// Supabase-migration-device-push-tokens.sql for the table this writes to.
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
