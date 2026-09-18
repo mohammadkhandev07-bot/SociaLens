@@ -5,6 +5,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { useCallEngine, peerAvatar, type CallType } from '@/lib/hooks/useCall'
 import { useCallSettings } from '@/lib/hooks/useChatSettings'
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription'
+import { useNativePush } from '@/lib/hooks/useNativePush'
 import { IncomingCallModal } from './IncomingCallModal'
 import { CallScreen } from './CallScreen'
 import { PermissionGate } from './PermissionGate'
@@ -46,6 +47,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const engine = useCallEngine(user?.id)
   const { data: callSettings } = useCallSettings(user?.id)
   usePushSubscription(user?.id)
+  useNativePush(user?.id)
   const [bannerError, setBannerError] = useState<string | null>(null)
 
   // Tapping "Accept" on the OS call notification (see public/sw.js) lands
