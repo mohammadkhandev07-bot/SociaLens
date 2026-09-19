@@ -113,7 +113,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <NativeAuthBridge />
         </ThemeProvider>
 
-        {/* Service Worker */}
+        {/* service Worker */}
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {
