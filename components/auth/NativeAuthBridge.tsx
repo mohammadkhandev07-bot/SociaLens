@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 // The other half of lib/utils/googleSignIn.ts's native flow: once someone
 // finishes signing in with Google in the system browser, Supabase
 // redirects that browser to com.socialens.app://login-callback?code=...,
-// which Android hands to this app (see the intent-filter added to
+// Which Android hands to this app (see the intent-filter added to
 // AndroidManifest.xml in ANDROID_NATIVE_SETUP.md) as an "app opened via
 // URL" event. This listens for exactly that, exchanges the code for a
 // real session the same way app/api/auth/callback/route.ts does for the
