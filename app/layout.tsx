@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { QueryProvider } from '@/components/shared/QueryProvider'
+import { NativeAuthBridge } from '@/components/auth/NativeAuthBridge'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -109,6 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <QueryProvider>{children}</QueryProvider>
+          <NativeAuthBridge />
         </ThemeProvider>
 
         {/* Service Worker */}
