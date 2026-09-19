@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { signInWithGoogle } from '@/lib/utils/googleSignIn'
 import { Captcha } from '@/components/shared/Captcha'
 
 interface LoginForm {
@@ -65,10 +66,8 @@ export default function LoginPage() {
   }
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/api/auth/callback` },
-    })
+    const { error } = await signInWithGoogle()
+    if (error) setError(error)
   }
 
   return (
