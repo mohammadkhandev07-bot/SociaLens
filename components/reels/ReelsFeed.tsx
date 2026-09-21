@@ -22,7 +22,7 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
 
   // Fetches the next batch of reels once someone's a couple videos out
   // from the end of what's loaded - matches the "keep the next few ready
-  // before you get there" prefetch feel of Reels/Shorts, instead of
+  // Before you get there" prefetch feel of Reels/Shorts, instead of
   // Pulling every video up front on open.
   useEffect(() => {
     if (!onLoadMore || !hasMore || isLoadingMore) return
