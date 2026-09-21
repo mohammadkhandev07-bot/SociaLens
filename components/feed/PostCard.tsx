@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
+import { BLANK_VIDEO_POSTER } from '@/lib/utils/media'
 
 interface PostCardProps {
   post: PostWithProfile
@@ -40,6 +41,8 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const articleRef = useRef<HTMLElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hasCountedViewRef = useRef(false)
+  const firstFrameShownRef = useRef(false)
+  const [videoNearViewport, setVideoNearViewport] = useState(false)
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
@@ -89,6 +92,55 @@ export function PostCard({ post, onDelete }: PostCardProps) {
     observer.observe(videoEl)
     return () => observer.disconnect()
   }, [post.media_url])
+
+  // Android WebView only hands out a small number of video decoders at a
+  // time. A feed scrolled a few pages deep holds 20-30 <video> elements, and
+  // every one past that limit silently never presents a frame - it reports
+  // itself as playing while showing nothing, which is exactly what feed
+  // videos did in the APK. So a post's video only holds a real `src` while
+  // it is anywhere near the screen, and hands the decoder back when it is
+  // not. 600px of margin means it is always ready before it is visible.
+  useEffect(() => {
+    const el = articleRef.current
+    if (!el || post.media_type !== 'video') return
+    const observer = new IntersectionObserver(
+      (entries) => setVideoNearViewport(!!entries[0]?.isIntersecting),
+      { rootMargin: '600px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [post.id, post.media_type])
+
+  useEffect(() => {
+    const videoEl = videoRef.current
+    const src = post.media_url
+    if (!videoEl || !src || post.media_type !== 'video') return
+
+    if (videoNearViewport) {
+      if (videoEl.getAttribute('src') !== src) {
+        videoEl.setAttribute('src', src)
+        firstFrameShownRef.current = false
+        videoEl.load()
+      }
+    } else if (videoEl.getAttribute('src')) {
+      try { videoEl.pause() } catch {}
+      videoEl.removeAttribute('src')
+      videoEl.load() // releases the decoder and any in-flight range requests
+    }
+  }, [videoNearViewport, post.media_url, post.media_type])
+
+  // preload="metadata" fetches the duration but never decodes a frame, so in
+  // Android WebView the element stayed empty (and got WebView's own grey
+  // placeholder painted over it). Nudging currentTime forces exactly one
+  // frame to be decoded and presented - that frame becomes the thumbnail,
+  // with no stored poster image needed anywhere.
+  const handleVideoMetadata = () => {
+    const videoEl = videoRef.current
+    if (!videoEl || firstFrameShownRef.current) return
+    if (!videoEl.paused || videoEl.currentTime > 0) return
+    firstFrameShownRef.current = true
+    try { videoEl.currentTime = 0.05 } catch {}
+  }
 
   const toggleComments = () => {
     setShowComments((v) => !v)
@@ -167,7 +219,21 @@ export function PostCard({ post, onDelete }: PostCardProps) {
       )}
       {post.media_url && post.media_type === 'video' && (
         <div className="w-full bg-black" style={{ maxHeight: '480px' }}>
-          <video ref={videoRef} src={post.media_url} controls className="w-full" style={{ maxHeight: '480px', objectFit: 'contain' }} preload="metadata" />
+          {/* `src` is attached/detached by the effect above, never here -
+              see the decoder-limit note. `poster` is set so WebView never
+              falls back to its own grey placeholder artwork, and
+              `playsInline` keeps playback inside the feed instead of
+              hijacking the whole screen. Controls/fullscreen unchanged. */}
+          <video
+            ref={videoRef}
+            controls
+            playsInline
+            preload="metadata"
+            poster={BLANK_VIDEO_POSTER}
+            onLoadedMetadata={handleVideoMetadata}
+            className="w-full"
+            style={{ maxHeight: '480px', objectFit: 'contain' }}
+          />
         </div>
       )}
 
