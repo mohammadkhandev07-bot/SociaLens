@@ -25,7 +25,7 @@ interface ReelCardProps {
   /**
    * True for the reel on screen and its immediate neighbours only. Reels
    * outside that window keep their layout but hold no video source at all -
-   * see the note on the effect below.
+   * See the note on the effect below.
    */
   shouldLoad: boolean
   isMuted: boolean
