@@ -17,15 +17,22 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
+import { BLANK_VIDEO_POSTER } from '@/lib/utils/media'
 
 interface ReelCardProps {
   post: PostWithProfile
   isActive: boolean
+  /**
+   * True for the reel on screen and its immediate neighbours only. Reels
+   * outside that window keep their layout but hold no video source at all -
+   * see the note on the effect below.
+   */
+  shouldLoad: boolean
   isMuted: boolean
   onToggleMute: () => void
 }
 
-export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProps) {
+export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: ReelCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const seekBarRef = useRef<HTMLDivElement>(null)
   const [liked, setLiked] = useState(post.is_liked ?? false)
@@ -59,9 +66,36 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
     }
   }
 
+  // Only the visible reel and its neighbours hold a real `src`. Previously
+  // every reel in the page mounted its own <video src>, so eight decoders
+  // were requested at once - Android WebView will not hand out that many,
+  // and the elements it refuses report themselves as playing while never
+  // presenting a single frame. That is precisely the grey placeholder that
+  // never went away on the reels screen in the APK. Keeping the neighbours
+  // loaded means swiping is still instant, and detaching the rest gives the
+  // decoder (and the network request) straight back.
+  useEffect(() => {
+    const videoEl = videoRef.current
+    if (!videoEl) return
+    const src = post.media_url ?? ''
+
+    if (shouldLoad && src) {
+      if (videoEl.getAttribute('src') !== src) {
+        videoEl.setAttribute('src', src)
+        videoEl.load()
+      }
+    } else if (videoEl.getAttribute('src')) {
+      try { videoEl.pause() } catch {}
+      videoEl.removeAttribute('src')
+      videoEl.load()
+      setProgress(0)
+      setPaused(false)
+    }
+  }, [shouldLoad, post.media_url])
+
   useEffect(() => {
     if (!videoRef.current) return
-    if (isActive && !showComments && !showShare) {
+    if (isActive && shouldLoad && !showComments && !showShare) {
       // Browsers can block autoplay-with-sound without a prior tap on the
       // Page - If that happens, fall back to starting muted rather than
       // The video just not playing at all, and let the mute button take
@@ -88,17 +122,18 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
         }, 1000)
       }
     } else {
-      videoRef.current.pause()
+      try { videoRef.current.pause() } catch {}
       // Scrolling away and back should always restart from the beginning,
       // like every other short-video feed - not resume from wherever it
-      // was left off.
-      videoRef.current.currentTime = 0
+      // was left off. (Guarded: the element may have had its src detached
+      // by the effect above, in which case seeking is a no-op.)
+      try { videoRef.current.currentTime = 0 } catch {}
       setProgress(0)
       hasCountedViewRef.current = false
       flushWatchTime()
     }
     return () => flushWatchTime()
-  }, [isActive, showComments, showShare, post.id])
+  }, [isActive, shouldLoad, showComments, showShare, post.id])
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = isMuted
@@ -193,7 +228,12 @@ export function ReelCard({ post, isActive, isMuted, onToggleMute }: ReelCardProp
   return (
     <div className="relative w-full h-full flex-shrink-0 bg-black snap-start snap-always overflow-hidden">
       {/* Video */}
-      <video ref={videoRef} src={post.media_url ?? ''} loop playsInline muted={isMuted}
+      {/* `src` is attached/detached by the effect above, never inline here.
+          `poster` stops Android WebView from painting its own stretched grey
+          placeholder over the reel before the first frame arrives. */}
+      <video ref={videoRef} loop playsInline muted={isMuted}
+        poster={BLANK_VIDEO_POSTER}
+        preload={shouldLoad ? 'auto' : 'none'}
         onClick={handleTap}
         onTimeUpdate={handleTimeUpdate}
         className="absolute inset-0 w-full h-full object-cover" />
