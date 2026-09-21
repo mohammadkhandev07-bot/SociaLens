@@ -5,19 +5,38 @@ import { pickCallProvider, type CallProviderName } from '@/lib/server/callProvid
 import { RtcTokenBuilder, RtcRole } from 'agora-token'
 
 const TOKEN_TTL_SECONDS = 2 * 60 * 60 // 2 hours - plenty for one call
+/** Must match MAX_JOIN_ATTEMPTS in lib/hooks/useCall.ts. */
+const MAX_UID_ATTEMPTS = 3
 
-async function buildAgoraConnection(roomName: string, forUserId: string) {
+/**
+ * Agora's uid is scoped to a single channel, so a stable per-user hash is
+ * fine for identity - and it must stay stable, because the token below is
+ * minted FOR that exact uid. Client-side randomness is therefore not an
+ * option: a uid the server didn't sign a token for is rejected by Agora.
+ *
+ * What the hash alone could not survive is the same person's PREVIOUS
+ * session still being registered in the channel (a WebView reload during a
+ * notification tap kills the page instantly, but Agora keeps the dead
+ * connection's uid for a short while). Rejoining with the identical uid in
+ * that window is what produces AgoraRTCError UID_CONFLICT.
+ *
+ * `attempt` fixes that without ever letting uid and token drift apart: the
+ * client reports which retry it is on, and the server mints a DIFFERENT uid
+ * *and* the matching token for it, as one pair, here. Range stays inside
+ * Agora's 1..2^32-1 limit: base is 1..1e9, and attempt is clamped to 0..3,
+ * so the largest possible uid is 4,000,000,001.
+ */
+async function buildAgoraConnection(roomName: string, forUserId: string, attempt = 0) {
   const appId = process.env.AGORA_APP_ID
   const appCertificate = process.env.AGORA_APP_CERTIFICATE
   if (!appId || !appCertificate) {
     throw new Error('Agora is not configured (AGORA_APP_ID / AGORA_APP_CERTIFICATE missing).')
   }
-  // Agora needs a small numeric uid per participant, not the Supabase
-  // UUID - it only has to be unique within this one channel, not tied to
-  // The person's identity anywhere else, so a stable hash is enough.
   let hash = 0
   for (const ch of forUserId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  const uid = (hash % 1000000000) + 1
+  const baseUid = (hash % 1000000000) + 1
+  const safeAttempt = Math.min(Math.max(Math.trunc(Number(attempt)) || 0, 0), MAX_UID_ATTEMPTS)
+  const uid = baseUid + safeAttempt * 1000000000
 
   const now = Math.floor(Date.now() / 1000)
   const token = RtcTokenBuilder.buildTokenWithUid(
@@ -79,7 +98,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { callId } = await request.json()
+  const { callId, attempt } = await request.json()
   if (!callId) return NextResponse.json({ error: 'callId is required' }, { status: 400 })
 
   const { data: call, error: fetchError } = await supabase
@@ -120,7 +139,7 @@ export async function POST(request: NextRequest) {
   try {
     const connection = provider === 'daily'
       ? await buildDailyConnection(roomName, user.id)
-      : await buildAgoraConnection(roomName, user.id)
+      : await buildAgoraConnection(roomName, user.id, attempt)
     return NextResponse.json(connection)
   } catch (err: any) {
     console.error('[calls/connect] provider setup failed', provider, err)
