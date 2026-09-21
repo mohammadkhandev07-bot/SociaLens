@@ -50,23 +50,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useNativePush(user?.id)
   const [bannerError, setBannerError] = useState<string | null>(null)
 
-  // Tapping "Accept" on the OS call notification (see public/sw.js) lands
-  // here with ?incomingCall=<id> in the URL - including on a cold start,
-  // where SociaLens was fully closed and this is the very first render.
-  // Read it once, then wait for that same call to actually show up as
-  // ringing (via the realtime listener/fallback poll in useCallEngine)
-  // before accepting it, since it may not have arrived yet on this first
-  // render. Stripped from the address bar immediately so refreshing or
-  // navigating back doesn't re-trigger it.
-  //
-  // The native Android app's Decline button (see CallMessagingService.kt)
-  // uses the same trick with ?declineCall=<id> instead - the notification
-  // there can't safely call /api/calls/decline on its own (that route
-  // needs the person's real logged-in session, which only this WebView
-  // actually has), so it opens the app long enough for this same code
-  // path to make that authenticated call for it.
+  // Tapping "Accept" on the OS call notification lands here with
+  // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
+  // CallMessagingService.kt in the Android app, which now uses the exact
+  // same contract. Decline lands here with ?declineCall=<id>: the
+  // notification can't call /api/calls/decline itself, because that route
+  // needs the person's real logged-in session, which only this WebView has.
   const pendingAcceptCallId = useRef<string | null>(null)
   const pendingDeclineCallId = useRef<string | null>(null)
+  const handledNotificationRef = useRef(false)
+
+  // Read the params exactly once, on the very first render, and strip them
+  // from the address bar immediately so a refresh or a back-navigation can
+  // never replay an accept/decline.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -81,21 +77,31 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''))
   }, [])
 
+  // Act on them as soon as the Supabase session is actually hydrated - not
+  // before. useCallEngine can't verify that a call belongs to this person
+  // until it knows who this person is, and on a cold start from the
+  // notification that takes a moment.
+  //
+  // This no longer waits for the call to show up as 'incoming-ringing' on
+  // its own (which relied on the 4-second polling backstop, and silently did
+  // nothing at all if the realtime INSERT had already been missed). It goes
+  // straight at the call by id, which is what makes the Android Accept
+  // button genuinely answer the existing call instead of just opening chat.
   useEffect(() => {
-    if (!pendingAcceptCallId.current) return
-    if (engine.phase === 'incoming-ringing' && engine.call?.id === pendingAcceptCallId.current) {
-      pendingAcceptCallId.current = null
-      engine.acceptIncoming()
-    }
-  }, [engine.phase, engine.call?.id, engine.acceptIncoming])
+    if (!user?.id || handledNotificationRef.current) return
+    const accept = pendingAcceptCallId.current
+    const decline = pendingDeclineCallId.current
+    if (!accept && !decline) return
 
-  useEffect(() => {
-    if (!pendingDeclineCallId.current) return
-    if (engine.phase === 'incoming-ringing' && engine.call?.id === pendingDeclineCallId.current) {
-      pendingDeclineCallId.current = null
-      engine.rejectIncoming()
-    }
-  }, [engine.phase, engine.call?.id, engine.rejectIncoming])
+    handledNotificationRef.current = true
+    pendingAcceptCallId.current = null
+    pendingDeclineCallId.current = null
+
+    // Decline wins if both somehow arrive - never answer a call the person
+    // just rejected.
+    if (decline) void engine.rejectIncomingById(decline)
+    else if (accept) void engine.acceptIncomingById(accept)
+  }, [user?.id, engine.acceptIncomingById, engine.rejectIncomingById])
 
   // Whenever the call engine reports an error (permission denied, DB
   // Insert failed, etc.) surface it here, auto-dismissing after a bit.
