@@ -32,6 +32,15 @@ interface PeerProfile {
 
 export type CallPhase = 'idle' | 'outgoing-ringing' | 'incoming-ringing' | 'connecting' | 'permission-prompt' | 'permission-blocked' | 'in-call'
 
+/**
+ * How many times a join may be retried after Agora reports UID_CONFLICT.
+ * Each retry asks the SERVER for a fresh uid + a token minted for that uid,
+ * so uid/token/channel can never drift apart - see /api/calls/connect.
+ */
+const MAX_JOIN_ATTEMPTS = 3
+/** Long enough for Agora to drop a connection that died with a page reload. */
+const JOIN_RETRY_DELAY_MS = 1500
+
 function describeCallError(err: any, context: 'media' | 'connect'): string {
   if (context === 'media') {
     if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
@@ -144,6 +153,29 @@ export function useCallEngine(currentUserId?: string) {
     startedAtMsRef.current = null
   }, [])
 
+  /**
+   * Tears the transport down WITHOUT reporting usage or logging anything -
+   * for failure paths, where the call never actually started. The important
+   * part is client.leave(): a client that joined but never published still
+   * occupies its uid in the channel, and any retry would then collide with
+   * itself (AgoraRTCError UID_CONFLICT).
+   */
+  const teardownTransportSilently = useCallback(async () => {
+    if (agoraRef.current) {
+      const { client, audioTrack, videoTrack } = agoraRef.current
+      try { audioTrack?.close() } catch {}
+      try { videoTrack?.close() } catch {}
+      try { await client.leave() } catch {}
+      agoraRef.current = null
+    }
+    if (dailyRef.current) {
+      try { await dailyRef.current.leave() } catch {}
+      try { dailyRef.current.destroy() } catch {}
+      dailyRef.current = null
+    }
+    providerRef.current = null
+  }, [])
+
   // Logs a finished call into the chat as a message, like a normal phone
   // app does ("Voice call - 2:14", "Missed call", etc). Only the caller's
   // side writes this (mirroring how only the caller's usage gets counted
@@ -223,11 +255,26 @@ export function useCallEngine(currentUserId?: string) {
   // ------------------------------------------------------------------
   const doConnectMedia = useCallback(async (activeCall: CallRow) => {
     setPhase('connecting')
-    try {
+
+    // One join attempt, deliberately ordered:
+    //   1. acquire microphone (and camera) FIRST
+    //   2. only then create the Agora client and join the channel
+    //   3. only then publish
+    //
+    // The previous order (join -> then ask for the mic) is the direct cause
+    // of AgoraRTCError UID_CONFLICT in the Android app. When the mic request
+    // failed there, the catch below did `setPhase('permission-blocked');
+    // return` and left behind a client that had ALREADY joined the channel.
+    // "Allow microphone" / "I've fixed it - Try Again" then called back into
+    // this same function, which built a SECOND client and asked it to join
+    // the SAME channel with the SAME uid. Agora refuses that, correctly.
+    // Acquiring media first means a permission failure happens before
+    // anything has joined, so there is never a ghost to collide with.
+    const attemptConnect = async (attempt: number): Promise<void> => {
       const res = await fetch('/api/calls/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callId: activeCall.id }),
+        body: JSON.stringify({ callId: activeCall.id, attempt }),
       })
       const info = await res.json()
       if (!res.ok) throw new Error(info?.error || 'Could not connect the call.')
@@ -236,8 +283,31 @@ export function useCallEngine(currentUserId?: string) {
 
       if (info.provider === 'agora') {
         const { default: AgoraRTC } = await import('agora-rtc-sdk-ng')
+
+        // ---- 1. Media first. This is the step that throws NotAllowedError
+        // when the WebView denies the permission, and it must happen while
+        // we are still holding nothing. ----
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
+        let videoTrack: any = null
+        if (activeCall.type === 'video') {
+          try {
+            videoTrack = await AgoraRTC.createCameraVideoTrack()
+          } catch (camErr) {
+            // No usable camera on this device - don't fail the whole call
+            // over it, just continue as audio-only and let them know why.
+            console.warn('[Agora] camera unavailable, continuing audio-only', camErr)
+            videoTrack = null
+            setError('No camera found on this device - continuing with audio only.')
+          }
+        }
+        const closeTracks = () => {
+          try { audioTrack?.close() } catch {}
+          try { videoTrack?.close() } catch {}
+        }
+
+        // ---- 2. Client + handlers ----
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
-        agoraRef.current = { client, audioTrack: null, videoTrack: null }
+        agoraRef.current = { client, audioTrack, videoTrack }
 
         client.on('user-published', async (remoteUser: any, mediaType: 'audio' | 'video') => {
           try {
@@ -274,25 +344,38 @@ export function useCallEngine(currentUserId?: string) {
           console.log('[Agora] connection state ->', curState, reason)
         })
 
-        await client.join(info.appId, info.channel, info.token, info.uid)
+        // ---- 3. Join. uid + token both come from the server response and
+        // are never touched here - they are minted as a matching pair. ----
+        try {
+          await client.join(info.appId, info.channel, info.token, info.uid)
+        } catch (joinErr: any) {
+          // Never leave a half-joined client behind, whatever went wrong.
+          try { await client.leave() } catch {}
+          agoraRef.current = null
 
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-        upsertTrack(localStreamObjRef.current, audioTrack.getMediaStreamTrack())
-        let videoTrack: any = null
-        if (activeCall.type === 'video') {
-          try {
-            videoTrack = await AgoraRTC.createCameraVideoTrack()
-            upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
-          } catch (camErr) {
-            // No usable camera on this device - don't fail the whole call
-            // over it, just continue as audio-only and let them know why.
-            console.warn('[Agora] camera unavailable, continuing audio-only', camErr)
-            videoTrack = null
-            setError('No camera found on this device - continuing with audio only.')
+          // UID_CONFLICT is not suppressed or hidden - it is handled for
+          // what it actually means: a PREVIOUS session belonging to this
+          // same person is still registered in this channel on Agora's
+          // side. In the APK that happens when the WebView reloads (a
+          // notification tap) faster than Agora times the dead connection
+          // out. The fix is to ask the server for a brand-new uid AND a
+          // token minted for that new uid, then retry - so uid, token and
+          // channel always stay consistent, because the server always
+          // issues them together.
+          const detail = `${joinErr?.code ?? ''} ${joinErr?.message ?? ''}`
+          if (/UID_CONFLICT/i.test(detail) && attempt < MAX_JOIN_ATTEMPTS) {
+            console.warn('[Agora] UID_CONFLICT on attempt', attempt, '- retrying with a fresh server-issued uid')
+            closeTracks()
+            await new Promise((resolve) => setTimeout(resolve, JOIN_RETRY_DELAY_MS))
+            return attemptConnect(attempt + 1)
           }
+          closeTracks()
+          throw joinErr
         }
-        agoraRef.current.audioTrack = audioTrack
-        agoraRef.current.videoTrack = videoTrack
+
+        // ---- 4. Publish ----
+        upsertTrack(localStreamObjRef.current, audioTrack.getMediaStreamTrack())
+        if (videoTrack) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         setLocalStream(localStreamObjRef.current)
         await client.publish([audioTrack, videoTrack].filter(Boolean))
       } else {
@@ -322,20 +405,29 @@ export function useCallEngine(currentUserId?: string) {
         await call.join({ url: info.roomUrl, token: info.token })
         if (activeCall.type === 'audio') await call.setLocalVideo(false)
       }
+    }
+
+    try {
+      await attemptConnect(0)
     } catch (err: any) {
       console.error('connectMedia failed', err)
       // A camera/mic error here (rather than a network/provider error)
       // means the permission pre-check above didn't catch it in time -
-      // most commonly an installed home-screen app on some Android
-      // phones that never surfaces the real permission prompt at all.
+      // most commonly Android's WebView denying the request outright.
       // Fall back to the same explainer screen (in its "blocked" form)
-      // instead of just leaving them with a generic error, since it also
-      // offers "open in browser" as a working escape hatch.
+      // instead of just leaving them with a generic error.
       const errName = String(err?.name || '')
       const errMsg = String(err?.message || err?.code || '')
       const isMediaError = ['NotAllowedError', 'NotFoundError', 'NotReadableError'].includes(errName)
         || /permission|not allowed|notallowed|denied/i.test(errMsg)
         || !navigator.mediaDevices?.getUserMedia
+
+      // Whatever happened, this attempt owns nothing any more. Without this
+      // the next attempt inherits a live client and collides with itself.
+      await teardownTransportSilently()
+      // Let the retry buttons actually re-enter connectMedia().
+      connectingCallIdRef.current = null
+
       if (isMediaError) {
         pendingCallRef.current = activeCall
         setPhase('permission-blocked')
@@ -346,7 +438,7 @@ export function useCallEngine(currentUserId?: string) {
       await updateCallStatus(activeCall.id, { status: 'ended', ended_at: new Date().toISOString() })
       cleanup('ended')
     }
-  }, [cleanup, updateCallStatus])
+  }, [cleanup, updateCallStatus, teardownTransportSilently])
 
   // Checks the browser's current camera/mic permission state (where the
   // Permissions API is available - Safari doesn't support querying
@@ -488,28 +580,107 @@ export function useCallEngine(currentUserId?: string) {
   // ------------------------------------------------------------------
   // Incoming call
   // ------------------------------------------------------------------
-  const acceptIncoming = useCallback(async () => {
-    if (!call) return
+  /**
+   * Loads a call row straight from the database and puts it into local
+   * state. This is what makes the Android notification's Accept button real:
+   * after a cold start (or the WebView reloading), this client has no idea a
+   * call is ringing, and waiting for the realtime INSERT event is hopeless -
+   * that event fired before this page existed. The 4-second polling backstop
+   * would eventually find it, but "eventually" is exactly how a caller ends
+   * up seeing "not answered". So we fetch it directly, by id.
+   *
+   * Returns null unless the call really is still ringing AND really is
+   * addressed to this user - the notification is never trusted on its own.
+   */
+  const hydrateIncomingCall = useCallback(async (callId: string): Promise<CallRow | null> => {
+    if (!currentUserId) return null
+    const { data } = await supabase.from('calls').select('*').eq('id', callId).single()
+    const row = (data ?? null) as CallRow | null
+    if (!row) return null
+    if (row.callee_id !== currentUserId) return null
+    if (row.status !== 'ringing') return null
+
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, is_verified, verification_type')
+      .eq('id', row.caller_id)
+      .single()
+
+    roleRef.current = 'callee'
+    callRef.current = row
+    setCall(row)
+    setPeer(callerProfile as PeerProfile)
+    return row
+  }, [currentUserId])
+
+  /**
+   * Answers one specific existing call. Used by the in-app Accept button AND
+   * by ?incomingCall=<id> (the Android notification action and public/sw.js
+   * both land here), so there is exactly ONE accept path in the app - the
+   * same one the working browser flow already used.
+   */
+  const acceptIncomingById = useCallback(async (callId: string): Promise<boolean> => {
+    const known = callRef.current?.id === callId ? callRef.current : null
+    const row = known ?? (await hydrateIncomingCall(callId))
+    if (!row) {
+      setError('That call has already ended.')
+      return false
+    }
+    // The notification action and the on-screen button can both fire within
+    // a moment of each other. Whichever gets here first claims the call;
+    // the other must NOT start a second transport session.
+    if (connectingCallIdRef.current === row.id) return true
+
     clearRingTimeout()
     roleRef.current = 'callee'
     try {
-      await updateCallStatus(call.id, { status: 'accepted', started_at: new Date().toISOString() })
-      const acceptedCall = { ...call, status: 'accepted' as CallStatus }
+      await updateCallStatus(row.id, { status: 'accepted', started_at: new Date().toISOString() })
+      const acceptedCall = { ...row, status: 'accepted' as CallStatus }
+      callRef.current = acceptedCall
       setCall(acceptedCall)
       await connectMedia(acceptedCall)
+      return true
     } catch (err: any) {
       console.error('acceptIncoming failed', err)
       setError(describeCallError(err, 'media'))
-      await updateCallStatus(call.id, { status: 'rejected' })
+      await updateCallStatus(row.id, { status: 'rejected' })
       cleanup()
+      return false
     }
-  }, [call, cleanup, connectMedia])
+  }, [hydrateIncomingCall, updateCallStatus, connectMedia, cleanup])
+
+  /**
+   * Rejects one specific existing call. Goes through /api/calls/decline
+   * because that works even when this client never had the call in state at
+   * all (Decline tapped on the notification while the app was closed) - the
+   * route re-checks on the server that this user really is the callee.
+   * Falls back to a direct row update if the request itself fails.
+   */
+  const rejectIncomingById = useCallback(async (callId: string): Promise<void> => {
+    try {
+      const res = await fetch('/api/calls/decline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId }),
+      })
+      if (!res.ok) throw new Error('decline endpoint returned ' + res.status)
+    } catch {
+      await updateCallStatus(callId, { status: 'rejected', ended_at: new Date().toISOString() })
+    }
+    if (callRef.current?.id === callId) cleanup()
+  }, [cleanup, updateCallStatus])
+
+  const acceptIncoming = useCallback(async () => {
+    const current = callRef.current
+    if (!current) return
+    await acceptIncomingById(current.id)
+  }, [acceptIncomingById])
 
   const rejectIncoming = useCallback(async () => {
-    if (!call) return
-    await updateCallStatus(call.id, { status: 'rejected' })
-    cleanup()
-  }, [call, cleanup])
+    const current = callRef.current
+    if (!current) return
+    await rejectIncomingById(current.id)
+  }, [rejectIncomingById])
 
   const endCall = useCallback(async (finalStatus: CallStatus = 'ended') => {
     const current = callRef.current
@@ -685,6 +856,8 @@ export function useCallEngine(currentUserId?: string) {
     cancelOutgoing,
     acceptIncoming,
     rejectIncoming,
+    acceptIncomingById,
+    rejectIncomingById,
     hangup: () => endCall('ended'),
     toggleMute,
     toggleCamera,
