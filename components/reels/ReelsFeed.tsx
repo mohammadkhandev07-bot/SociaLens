@@ -85,6 +85,12 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
             key={(item as PostWithProfile).id}
             post={item as PostWithProfile}
             isActive={index === activeIndex}
+            // Active reel +/- 1 only. Everything else keeps its place in the
+            // scroller but holds no video source, so Android WebView is
+            // never asked for more decoders than it is willing to give -
+            // which is what left every reel stuck on a placeholder in the
+            // APK. Infinite scroll and swipe navigation are untouched.
+            shouldLoad={Math.abs(index - activeIndex) <= 1}
             isMuted={isMuted}
             onToggleMute={() => setIsMuted(m => !m)}
           />
