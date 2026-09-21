@@ -76,7 +76,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   }, [post.id])
 
   // Pauses this post's video the moment it scrolls mostly out of view -
-  // otherwise a video someone started playing keeps running (and making
+  // Otherwise a video someone started playing keeps running (and making
   // sound) even after they've scrolled well past it in the feed.
   useEffect(() => {
     const videoEl = videoRef.current
