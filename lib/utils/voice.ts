@@ -1,16 +1,44 @@
 'use client'
 
-// Read-aloud uses the browser's own built-in voice directly - always has,
-// this file used to try Microsoft's Edge TTS service first (via
-// /api/aperonix/speak) and only fall back to the browser voice if that
-// failed, but Microsoft's side of that workaround is unreliable enough
-// that people were routinely waiting out a long timeout before ever
-// hearing anything. The browser's native voice is instant and "good
-// enough" is much better than "great, but usually late."
-// Voice input (speech-to-text) always uses the browser's native API -
-// support varies: best in Chrome/Edge, not available in Firefox.
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
+
+interface SociaLensTtsPlugin {
+  speak(options: {
+    text: string
+    language?: string
+    rate?: number
+    pitch?: number
+  }): Promise<{ utteranceId: string }>
+  stop(): Promise<void>
+  addListener(
+    eventName: 'finished',
+    listenerFunc: (event: { utteranceId: string; error: boolean }) => void,
+  ): Promise<PluginListenerHandle>
+}
+
+const NativeTts = registerPlugin<SociaLensTtsPlugin>('SociaLensTts')
 
 let cachedVoices: SpeechSynthesisVoice[] = []
+let nativeListener: PluginListenerHandle | null = null
+let nativeOnEnd: (() => void) | null = null
+let speechGeneration = 0
+
+function finishNativeSpeech(generation: number) {
+  if (generation !== speechGeneration) return
+  const onEnd = nativeOnEnd
+  nativeOnEnd = null
+  void nativeListener?.remove()
+  nativeListener = null
+  onEnd?.()
+}
+
+async function stopNativeSpeech() {
+  speechGeneration++
+  nativeOnEnd = null
+  try { await NativeTts.stop() } catch {}
+  try { await nativeListener?.remove() } catch {}
+  nativeListener = null
+}
 
 function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
@@ -24,34 +52,22 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
       resolve(existing)
       return
     }
-    // Voices often load asynchronously on first page load.
     window.speechSynthesis.onvoiceschanged = () => {
       cachedVoices = window.speechSynthesis.getVoices()
       resolve(cachedVoices)
     }
-    // Fallback in case the event never fires (some browsers/OSes).
     setTimeout(() => resolve(window.speechSynthesis.getVoices()), 500)
   })
 }
 
-// Strips emojis and stray markdown symbols before speaking - without this,
-// some voice engines literally announce emojis ("grinning face", "star",
-// etc.) or read out "asterisk asterisk" around bold text, which sounds
-// nothing like a real person talking.
 function cleanTextForSpeech(text: string): string {
   return text
-    // Emoji + pictograph + symbol + flag ranges, plus the invisible
-    // variation-selector/zero-width-joiner characters emoji sequences use.
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{2190}-\u{21FF}]/gu, '')
-    // Markdown formatting characters that would otherwise get spoken aloud.
     .replace(/[*_~`#]/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
 
-// Picks the nicest-sounding female English voice available on this device,
-// for the fallback path only - Edge TTS (the primary path) always uses the
-// same fixed voice, this is just what plays if that route is unreachable.
 function pickAperonixVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   const preferredNames = [
     'Google UK English Female', 'Google US English', 'Google हिन्दी',
@@ -62,18 +78,42 @@ function pickAperonixVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice
     const match = voices.find(v => v.name.includes(name))
     if (match) return match
   }
-  // Any other Google voice at all still sounds better than most local ones.
   const anyGoogle = voices.find(v => v.name.startsWith('Google') && v.lang.startsWith('en'))
   if (anyGoogle) return anyGoogle
-  // Fall back to anything explicitly flagged/named "female".
   const femaleMatch = voices.find(v => /female/i.test(v.name))
   if (femaleMatch) return femaleMatch
-  // Last resort - any English voice at all.
   return voices.find(v => v.lang.startsWith('en')) || voices[0]
 }
 
 interface SpeakHandle {
   stop: () => void
+}
+
+async function speakWithNativeAndroid(cleaned: string, onEnd: () => void): Promise<SpeakHandle> {
+  await stopNativeSpeech()
+  const generation = speechGeneration
+  nativeOnEnd = onEnd
+
+  nativeListener = await NativeTts.addListener('finished', (event) => {
+    if (event.error) finishNativeSpeech(generation)
+    else finishNativeSpeech(generation)
+  })
+
+  try {
+    await NativeTts.speak({
+      text: cleaned,
+      language: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+      rate: 0.93,
+      pitch: 1.02,
+    })
+  } catch (error) {
+    await nativeListener.remove()
+    nativeListener = null
+    nativeOnEnd = null
+    throw error
+  }
+
+  return { stop: () => { void stopNativeSpeech() } }
 }
 
 async function speakWithBrowserVoice(cleaned: string, onEnd: () => void): Promise<SpeakHandle> {
@@ -99,21 +139,31 @@ async function speakWithBrowserVoice(cleaned: string, onEnd: () => void): Promis
   return { stop: () => window.speechSynthesis.cancel() }
 }
 
-export async function speakText(
-  text: string,
-  onEnd: () => void
-): Promise<SpeakHandle> {
+export async function speakText(text: string, onEnd: () => void): Promise<SpeakHandle> {
   const cleaned = cleanTextForSpeech(text)
   if (!cleaned) {
     onEnd()
     return { stop: () => {} }
   }
 
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    try {
+      return await speakWithNativeAndroid(cleaned, onEnd)
+    } catch {
+      // If Android TTS is unavailable on a particular device, keep the
+      // existing browser path as a graceful fallback rather than crashing.
+    }
+  }
+
   return speakWithBrowserVoice(cleaned, onEnd)
 }
 
 export function stopSpeaking() {
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    void stopNativeSpeech()
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    speechGeneration++
     window.speechSynthesis.cancel()
   }
 }
@@ -130,9 +180,6 @@ interface VoiceInputHandlers {
   onError?: () => void
 }
 
-// Wraps the browser's SpeechRecognition object (typed loosely as `any`
-// since it isn't part of the standard TS DOM lib) into a simple
-// start/stop control the UI can drive directly.
 export function createVoiceInput(handlers: VoiceInputHandlers) {
   const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   if (!SpeechRecognitionCtor) return null
@@ -156,10 +203,7 @@ export function createVoiceInput(handlers: VoiceInputHandlers) {
     handlers.onInterim(finalTranscript + interim)
   }
 
-  recognition.onerror = () => {
-    handlers.onError?.()
-  }
-
+  recognition.onerror = () => handlers.onError?.()
   recognition.onend = () => {
     handlers.onFinal(finalTranscript.trim())
     handlers.onEnd()
