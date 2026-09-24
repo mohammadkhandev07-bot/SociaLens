@@ -16,23 +16,52 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 /**
- * Registers this device for Web Push once the user is logged in, so calls
- * and messages can raise a system notification even when SociaLens isn't
- * open in a tab. Silently does nothing if the browser doesn't support
- * push, if the VAPID public key isn't configured, or if the person hasn't
- * granted notification permission - it never interrupts the app.
+ * Web Push is used by the normal browser/PWA version. The native Android
+ * shell has its own FCM registration, so keeping a Web Push subscription in
+ * the WebView would make the same call arrive through two notification paths.
+ * On native Android we therefore remove any old Web Push subscription and
+ * leave FCM as the only native notification transport.
  */
 export function usePushSubscription(userId?: string) {
   useEffect(() => {
     if (!userId) return
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
 
     let cancelled = false
 
     ;(async () => {
+      let Capacitor: typeof import('@capacitor/core').Capacitor
       try {
-        // Ask for permission the first time only - if the user already
-        // said no, we don't nag them again on every load.
+        ;({ Capacitor } = await import('@capacitor/core'))
+      } catch {
+        Capacitor = null as unknown as typeof import('@capacitor/core').Capacitor
+      }
+
+      if (Capacitor?.isNativePlatform()) {
+        try {
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready
+            const subscription = await registration.pushManager.getSubscription()
+            if (subscription) {
+              const endpoint = subscription.endpoint
+              await subscription.unsubscribe()
+              if (!cancelled) {
+                await fetch('/api/push/subscribe', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ endpoint }),
+                })
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[push] native web-push cleanup failed', err)
+        }
+        return
+      }
+
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+      try {
         if (Notification.permission === 'default') {
           const result = await Notification.requestPermission()
           if (result !== 'granted') return
