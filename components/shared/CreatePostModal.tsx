@@ -260,6 +260,8 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
         const path = `${user.id}/${Date.now()}.${ext}`
         const { error } = await supabase.storage.from('posts').upload(path, fileToUpload, {
           cacheControl: LONG_CACHE_CONTROL,
+          contentType: fileToUpload.type || (mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'),
+          upsert: false,
         })
         if (error) throw error
         setUploadProgress(80)
