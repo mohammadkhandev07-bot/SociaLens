@@ -70,4 +70,4 @@ export async function GET(request: NextRequest) {
   } catch {
     return new NextResponse('Media proxy failed', { status: 502 })
   }
-}
+} 
