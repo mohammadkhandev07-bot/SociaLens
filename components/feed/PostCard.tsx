@@ -21,7 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
-import { BLANK_VIDEO_POSTER, getMediaPlaybackUrl } from '@/lib/utils/media'
+import { BLANK_VIDEO_POSTER } from '@/lib/utils/media'
 
 interface PostCardProps {
   post: PostWithProfile
@@ -43,7 +43,6 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const hasCountedViewRef = useRef(false)
   const firstFrameShownRef = useRef(false)
   const [videoNearViewport, setVideoNearViewport] = useState(false)
-  const [usingMediaProxy, setUsingMediaProxy] = useState(true)
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
@@ -113,13 +112,8 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   }, [post.id, post.media_type])
 
   useEffect(() => {
-    setUsingMediaProxy(true)
-  }, [post.id, post.media_url])
-
-  useEffect(() => {
     const videoEl = videoRef.current
-    const directSrc = post.media_url
-    const src = directSrc ? (usingMediaProxy ? getMediaPlaybackUrl(directSrc) : directSrc) : directSrc
+    const src = post.media_url
     if (!videoEl || !src || post.media_type !== 'video') return
 
     if (videoNearViewport) {
@@ -133,17 +127,13 @@ export function PostCard({ post, onDelete }: PostCardProps) {
       videoEl.removeAttribute('src')
       videoEl.load() // releases the decoder and any in-flight range requests
     }
-  }, [videoNearViewport, post.media_url, post.media_type, usingMediaProxy])
+  }, [videoNearViewport, post.media_url, post.media_type])
 
   // preload="metadata" fetches the duration but never decodes a frame, so in
   // Android WebView the element stayed empty (and got WebView's own grey
   // placeholder painted over it). Nudging currentTime forces exactly one
   // frame to be decoded and presented - that frame becomes the thumbnail,
   // with no stored poster image needed anywhere.
-  const handleVideoError = () => {
-    if (usingMediaProxy && post.media_url) setUsingMediaProxy(false)
-  }
-
   const handleVideoMetadata = () => {
     const videoEl = videoRef.current
     if (!videoEl || firstFrameShownRef.current) return
@@ -241,7 +231,6 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             preload="metadata"
             poster={BLANK_VIDEO_POSTER}
             onLoadedMetadata={handleVideoMetadata}
-            onError={handleVideoError}
             className="w-full"
             style={{ maxHeight: '480px', objectFit: 'contain' }}
           />
