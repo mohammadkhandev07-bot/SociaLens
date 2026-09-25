@@ -1,4 +1,4 @@
-const CACHE_NAME = 'geolink-v5'
+const CACHE_NAME = 'geolink-v4'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
@@ -10,117 +10,57 @@ const PRECACHE = [
   '/icons/icon-512x512.png',
 ]
 
-self.addEventListener('install', event => {
-  event.waitUntil(
+self.addEventListener('install', e => {
+  e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE))
       .then(() => self.skipWaiting())
   )
 })
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
+self.addEventListener('activate', e => {
+  e.waitUntil(
     caches.keys()
-      .then(keys =>
-        Promise.all(
-          keys
-            .filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
+      .then(keys => Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME)
+          .map(k => caches.delete(k))
+      ))
+      .then(() => clients.claim())
   )
 })
 
-self.addEventListener('fetch', event => {
-  const request = event.request
-  const url = new URL(request.url)
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url)
 
-  // Only handle requests belonging to SociaLens itself.
-  if (url.origin !== self.location.origin) {
-    return
-  }
-
-  // Handle Web Share Target POST.
   if (
-    request.method === 'POST' &&
-    url.pathname === '/share'
+    e.request.method === 'POST' &&
+    url.pathname === '/share' &&
+    url.origin === location.origin
   ) {
-    event.respondWith(handleShareTarget(request))
+    e.respondWith(handleShareTarget(e.request))
     return
   }
 
-  // Service worker caching is only for GET requests.
-  if (request.method !== 'GET') {
-    return
-  }
+  if (e.request.method !== 'GET') return
+  if (url.origin !== location.origin) return
 
-  const isApi = url.pathname.startsWith('/api/')
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone()
 
-  const isVideo =
-    request.destination === 'video' ||
-    /\.(mp4|m4v|webm|mov|ogg)(?:$|\?)/i.test(url.pathname)
+        caches.open(CACHE_NAME)
+          .then(c => c.put(e.request, clone))
 
-  const isNavigation = request.mode === 'navigate'
-
-  /*
-   * IMPORTANT:
-   *
-   * Do NOT cache:
-   * - API responses
-   * - video responses
-   * - navigation documents
-   *
-   * Video requests can use HTTP Range / 206 Partial Content.
-   * Caching a partial video response can make Android WebView
-   * unable to load the complete video.
-   *
-   * Navigation requests are network-first so a new Vercel
-   * deployment is not hidden behind an old cached page.
-   */
-  const shouldNotCache =
-    isApi ||
-    isVideo ||
-    isNavigation
-
-  event.respondWith(
-    fetch(
-      request,
-      shouldNotCache
-        ? { cache: 'no-store' }
-        : { cache: 'default' }
-    )
-      .then(response => {
-
-        /*
-         * Only cache normal non-API, non-video, non-navigation
-         * successful responses.
-         */
-        if (
-          response.ok &&
-          !shouldNotCache
-        ) {
-          const clone = response.clone()
-
-          caches.open(CACHE_NAME)
-            .then(cache => {
-              return cache.put(request, clone)
-            })
-            .catch(() => {})
-        }
-
-        return response
+        return res
       })
-      .catch(() => {
-        return caches.match(request)
-          .then(cachedResponse => {
-            if (cachedResponse) {
-              return cachedResponse
-            }
-
-            return caches.match(OFFLINE_URL)
-          })
-      })
+      .catch(() =>
+        caches.match(e.request)
+          .then(cached =>
+            cached || caches.match(OFFLINE_URL)
+          )
+      )
   )
 })
 
@@ -129,7 +69,7 @@ async function handleShareTarget(request) {
 
   try {
     await request.formData()
-  } catch (error) {
+  } catch (err) {
     // Ignore share parsing errors.
   }
 
@@ -139,31 +79,27 @@ async function handleShareTarget(request) {
   )
 }
 
-self.addEventListener('push', event => {
-  if (!event.data) {
-    return
-  }
+self.addEventListener('push', e => {
+  if (!e.data) return
 
   let data = {
     title: 'GeoLink',
     body: 'New notification',
     url: '/feed',
-    kind: 'generic',
+    kind: 'generic'
   }
 
   try {
     data = {
       ...data,
-      ...event.data.json(),
+      ...e.data.json()
     }
-  } catch (error) {
-    // Ignore invalid push payload.
-  }
+  } catch {}
 
   const isCall = data.kind === 'call'
   const isMessage = data.kind === 'message'
 
-  event.waitUntil(
+  e.waitUntil(
     self.registration.showNotification(
       data.title,
       {
@@ -181,7 +117,7 @@ self.addEventListener('push', event => {
           url: data.url,
           kind: data.kind,
           callId: data.callId,
-          chatId: data.chatId,
+          chatId: data.chatId
         },
 
         tag: data.tag || 'geolink',
@@ -194,46 +130,41 @@ self.addEventListener('push', event => {
           ? [
               {
                 action: 'accept',
-                title: 'Accept',
+                title: 'Accept'
               },
               {
                 action: 'decline',
-                title: 'Decline',
-              },
+                title: 'Decline'
+              }
             ]
           : isMessage
-            ? [
-                {
-                  action: 'reply',
-                  title: 'Open chat',
-                },
-              ]
-            : [],
+          ? [
+              {
+                action: 'reply',
+                title: 'Open chat'
+              }
+            ]
+          : [],
       }
     )
   )
 })
 
-self.addEventListener('notificationclick', event => {
-  const notification = event.notification
-
+self.addEventListener('notificationclick', e => {
   const {
     url,
     kind,
     callId,
-    chatId,
-  } = notification.data || {}
+    chatId
+  } = e.notification.data || {}
 
-  notification.close()
+  e.notification.close()
 
-  /*
-   * Decline incoming call directly from notification.
-   */
   if (
     kind === 'call' &&
-    event.action === 'decline'
+    e.action === 'decline'
   ) {
-    event.waitUntil(
+    e.waitUntil(
       fetch(
         '/api/calls/decline',
         {
@@ -242,12 +173,12 @@ self.addEventListener('notificationclick', event => {
           credentials: 'same-origin',
 
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
 
           body: JSON.stringify({
-            callId,
-          }),
+            callId
+          })
         }
       ).catch(() => {})
     )
@@ -261,71 +192,56 @@ self.addEventListener('notificationclick', event => {
       ? `/chat/${chatId}`
       : '/feed')
 
-  /*
-   * Preserve incoming call ID in the URL.
-   *
-   * This is important when the app is completely closed.
-   * A newly opened page can read the call ID after startup.
-   */
   if (
     kind === 'call' &&
     callId
   ) {
-    const separator =
+    const sep =
       targetUrl.includes('?')
         ? '&'
         : '?'
 
     targetUrl =
-      `${targetUrl}${separator}incomingCall=${encodeURIComponent(callId)}`
+      `${targetUrl}${sep}incomingCall=${encodeURIComponent(callId)}`
   }
 
-  event.waitUntil(
-    clients
-      .matchAll({
-        type: 'window',
-      })
-      .then(clientList => {
+  e.waitUntil(
+    clients.matchAll({
+      type: 'window'
+    }).then(list => {
 
-        for (const client of clientList) {
-          if ('focus' in client) {
-            client.navigate(targetUrl)
-            client.focus()
-
-            return
-          }
+      for (const c of list) {
+        if ('focus' in c) {
+          c.navigate(targetUrl)
+          c.focus()
+          return
         }
+      }
 
-        return clients.openWindow(targetUrl)
-      })
+      return clients.openWindow(targetUrl)
+    })
   )
 })
 
-self.addEventListener('message', event => {
+self.addEventListener('message', e => {
 
-  /*
-   * Force the new service worker to activate.
-   */
   if (
-    event.data?.type === 'SKIP_WAITING'
+    e.data?.type === 'SKIP_WAITING'
   ) {
     self.skipWaiting()
   }
 
-  /*
-   * App badge support.
-   */
   if (
-    event.data?.type === 'SET_BADGE' &&
+    e.data?.type === 'SET_BADGE' &&
     'setAppBadge' in navigator
   ) {
     navigator
-      .setAppBadge(event.data.count)
+      .setAppBadge(e.data.count)
       .catch(() => {})
   }
 
   if (
-    event.data?.type === 'CLEAR_BADGE' &&
+    e.data?.type === 'CLEAR_BADGE' &&
     'clearAppBadge' in navigator
   ) {
     navigator
