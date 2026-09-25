@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
-import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
+import { BLANK_VIDEO_POSTER, getMediaPlaybackUrl } from '@/lib/utils/media'
 
 interface ReelCardProps {
   post: PostWithProfile
@@ -45,7 +45,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const [markedNotInterested, setMarkedNotInterested] = useState(false)
   const [progress, setProgress] = useState(0) // 0-100
   const [seeking, setSeeking] = useState(false)
-  const [usingMediaProxy, setUsingMediaProxy] = useState(false)
+  const [usingMediaProxy, setUsingMediaProxy] = useState(true)
   const hasCountedViewRef = useRef(false)
   const { user, profile } = useUser()
   const supabase = createClient()
@@ -79,7 +79,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
     const videoEl = videoRef.current
     if (!videoEl) return
     const directSrc = post.media_url ?? ''
-    const src = usingMediaProxy && directSrc ? getMediaProxyUrl(directSrc) : directSrc
+    const src = usingMediaProxy && directSrc ? getMediaPlaybackUrl(directSrc) : directSrc
 
     if (shouldLoad && src) {
       if (videoEl.getAttribute('src') !== src) {
@@ -96,7 +96,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   }, [shouldLoad, post.media_url, usingMediaProxy])
 
   useEffect(() => {
-    setUsingMediaProxy(false)
+    setUsingMediaProxy(true)
   }, [post.id, post.media_url])
 
   useEffect(() => {
@@ -153,8 +153,8 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   }, [post.id, user?.id])
 
   const handleVideoError = () => {
-    if (!usingMediaProxy && post.media_url) {
-      setUsingMediaProxy(true)
+    if (usingMediaProxy && post.media_url) {
+      setUsingMediaProxy(false)
     }
   }
 
