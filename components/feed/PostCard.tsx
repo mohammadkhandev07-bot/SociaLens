@@ -57,7 +57,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
 
   // Counts a view the first time this post actually scrolls into view -
   // Not just when the component mounts (it might be far down an
-  // unopened feed) and never more than once per mount, so scrolling past
+  // Unopened feed) and never more than once per mount, so scrolling past
   // It back and forth doesn't inflate the count.
   useEffect(() => {
     const el = articleRef.current
