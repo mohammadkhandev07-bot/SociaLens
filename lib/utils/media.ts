@@ -21,3 +21,12 @@
  */
 export const BLANK_VIDEO_POSTER =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+/**
+ * Retry path for media whose Supabase object metadata/range response is not
+ * handled correctly by an Android WebView. The proxy is deliberately limited
+ * to the configured Supabase storage host and is only used after the direct
+ * media URL reports a playback error.
+ */
+export function getMediaProxyUrl(src: string): string {
+  return `/api/media/proxy?url=${encodeURIComponent(src)}`
+}
