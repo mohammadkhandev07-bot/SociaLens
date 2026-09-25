@@ -21,7 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
-import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
+import { BLANK_VIDEO_POSTER, getMediaPlaybackUrl } from '@/lib/utils/media'
 
 interface PostCardProps {
   post: PostWithProfile
@@ -43,7 +43,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const hasCountedViewRef = useRef(false)
   const firstFrameShownRef = useRef(false)
   const [videoNearViewport, setVideoNearViewport] = useState(false)
-  const [usingMediaProxy, setUsingMediaProxy] = useState(false)
+  const [usingMediaProxy, setUsingMediaProxy] = useState(true)
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
@@ -113,13 +113,13 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   }, [post.id, post.media_type])
 
   useEffect(() => {
-    setUsingMediaProxy(false)
+    setUsingMediaProxy(true)
   }, [post.id, post.media_url])
 
   useEffect(() => {
     const videoEl = videoRef.current
     const directSrc = post.media_url
-    const src = directSrc && usingMediaProxy ? getMediaProxyUrl(directSrc) : directSrc
+    const src = directSrc ? (usingMediaProxy ? getMediaPlaybackUrl(directSrc) : directSrc) : directSrc
     if (!videoEl || !src || post.media_type !== 'video') return
 
     if (videoNearViewport) {
@@ -141,7 +141,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   // frame to be decoded and presented - that frame becomes the thumbnail,
   // with no stored poster image needed anywhere.
   const handleVideoError = () => {
-    if (!usingMediaProxy && post.media_url) setUsingMediaProxy(true)
+    if (usingMediaProxy && post.media_url) setUsingMediaProxy(false)
   }
 
   const handleVideoMetadata = () => {
