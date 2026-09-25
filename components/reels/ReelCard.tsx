@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
-import { BLANK_VIDEO_POSTER } from '@/lib/utils/media'
+import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
 
 interface ReelCardProps {
   post: PostWithProfile
@@ -45,6 +45,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const [markedNotInterested, setMarkedNotInterested] = useState(false)
   const [progress, setProgress] = useState(0) // 0-100
   const [seeking, setSeeking] = useState(false)
+  const [usingMediaProxy, setUsingMediaProxy] = useState(false)
   const hasCountedViewRef = useRef(false)
   const { user, profile } = useUser()
   const supabase = createClient()
@@ -77,7 +78,8 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   useEffect(() => {
     const videoEl = videoRef.current
     if (!videoEl) return
-    const src = post.media_url ?? ''
+    const directSrc = post.media_url ?? ''
+    const src = usingMediaProxy && directSrc ? getMediaProxyUrl(directSrc) : directSrc
 
     if (shouldLoad && src) {
       if (videoEl.getAttribute('src') !== src) {
@@ -91,7 +93,11 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
       setProgress(0)
       setPaused(false)
     }
-  }, [shouldLoad, post.media_url])
+  }, [shouldLoad, post.media_url, usingMediaProxy])
+
+  useEffect(() => {
+    setUsingMediaProxy(false)
+  }, [post.id, post.media_url])
 
   useEffect(() => {
     if (!videoRef.current) return
@@ -145,6 +151,12 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
     supabase.from('likes').select('id').eq('post_id', post.id).eq('user_id', user.id)
       .maybeSingle().then(({ data }) => setLiked(!!data))
   }, [post.id, user?.id])
+
+  const handleVideoError = () => {
+    if (!usingMediaProxy && post.media_url) {
+      setUsingMediaProxy(true)
+    }
+  }
 
   const handleTap = () => {
     if (!videoRef.current || showComments || showShare) return
@@ -236,6 +248,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         preload={shouldLoad ? 'auto' : 'none'}
         onClick={handleTap}
         onTimeUpdate={handleTimeUpdate}
+        onError={handleVideoError}
         className="absolute inset-0 w-full h-full object-cover" />
 
       {paused && (
