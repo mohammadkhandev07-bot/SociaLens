@@ -24,7 +24,7 @@ interface ReelCardProps {
   isActive: boolean
   /**
    * True for the reel on screen and its immediate neighbours only. Reels
-   * outside that window keep their layout but hold no video source at all -
+   * Outside that window keep their layout but hold no video source at all -
    * see the note on the effect below.
    */
   shouldLoad: boolean
