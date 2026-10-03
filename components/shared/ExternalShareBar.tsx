@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Share2, Copy, Check, Loader2 } from 'lucide-react'
+import { Share2, Check, Loader2 } from 'lucide-react'
+
+declare global {
+  interface Window {
+    SociaLensNativeShare?: {
+      share: (title: string, text: string, url: string) => void
+    }
+  }
+}
 
 interface ExternalShareBarProps {
   // Called only when the user actually taps the button - builds/returns the
@@ -12,13 +20,9 @@ interface ExternalShareBarProps {
   shareText: string
 }
 
-// Sits at the top of a Share modal, above the in-app followers/following
-// list. Tapping it hands off to the device's own native share sheet
-// (navigator.share) - which lists every app on the phone capable of
-// receiving a share (WhatsApp, Messages, Gmail, etc.), exactly like
-// tapping "Share" on a photo from the phone's own gallery would. On a
-// browser that doesn't support that (mainly older/desktop browsers), it
-// falls back to just copying the link.
+// On the SociaLens Android shell, use the native Kotlin bridge so the
+// Android Sharesheet opens even on WebViews where navigator.share is absent.
+// In a normal browser, use Web Share API and finally clipboard as fallback.
 export function ExternalShareBar({ getShareUrl, shareTitle, shareText }: ExternalShareBarProps) {
   const [preparing, setPreparing] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -29,16 +33,22 @@ export function ExternalShareBar({ getShareUrl, shareTitle, shareText }: Externa
     setPreparing(true)
     try {
       const url = await getShareUrl()
-      if (typeof navigator !== 'undefined' && navigator.share) {
+      // Native Android bridge is installed by MainActivity in the APK.
+      // It invokes Intent.createChooser(ACTION_SEND), showing installed apps.
+      if (typeof window !== 'undefined' && window.SociaLensNativeShare) {
+        window.SociaLensNativeShare.share(shareTitle, shareText, url)
+      } else if (typeof navigator !== 'undefined' && navigator.share) {
         try {
           await navigator.share({ title: shareTitle, text: shareText, url })
         } catch {
-          // User backed out of the native share sheet - not an error.
+          // The user dismissed the native share sheet; this is not an error.
         }
       } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(url)
         setCopied(true)
         setTimeout(() => setCopied(false), 2500)
+      } else {
+        setError('Sharing is not available on this device.')
       }
     } catch {
       setError("Couldn't create a share link. Please try again.")
