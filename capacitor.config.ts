@@ -22,6 +22,9 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   android: {
+    // Keep the WebView clear of Android system bars on devices that enforce edge-to-edge.
+    // This prevents the status bar from covering the app's top controls on some phones.
+    adjustMarginsForEdgeToEdge: 'auto',
     // Matches the app's dark theme so there's no white flash on launch.
     backgroundColor: '#000000',
   },
