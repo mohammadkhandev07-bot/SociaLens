@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, ChevronRight, Smartphone, User, ShieldCheck, ShieldAlert, Headset } from 'lucide-react'
+import { LogOut, ChevronRight, User, ShieldCheck, ShieldAlert, Headset } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useUser } from '@/lib/hooks/useUser'
@@ -14,52 +13,6 @@ export default function SettingsPage() {
   const { profile, loading } = useUser()
   const router = useRouter()
   const supabase = createClient()
-
-  // PWA install - lives here (not the landing page) so it only shows up once
-  // Someone already has an account and has spent a bit of time in the app,
-  // Which is also when the browser is actually willing to fire the native prompt.
-  const [installPrompt, setInstallPrompt] = useState<any>(null)
-  const [installed, setInstalled] = useState(false)
-  const [installing, setInstalling] = useState(false)
-  const [isIOS, setIsIOS] = useState(false)
-
-  useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true)
-    }
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream)
-
-    const handler = (e: any) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', () => {
-      setInstalled(true)
-      setInstalling(false)
-    })
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  const handleInstall = async () => {
-    if (installed) return
-
-    if (installPrompt) {
-      setInstalling(true)
-      await installPrompt.prompt()
-      const { outcome } = await installPrompt.userChoice
-      if (outcome !== 'accepted') setInstalling(false)
-      setInstallPrompt(null)
-      return
-    }
-
-    if (isIOS) {
-      alert('To install SociaLens on iPhone:\n\n1. Open this page in Safari\n2. Tap the Share button (bottom center)\n3. Tap "Add to Home Screen"\n4. Tap "Add"')
-      return
-    }
-
-    alert("Your browser doesn't support installing SociaLens yet. Try opening this page in Chrome or Edge.")
-  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -139,33 +92,6 @@ export default function SettingsPage() {
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* App - only show if not already installed */}
-      {!installed && (
-        <Card>
-          <CardContent className="pt-4 divide-y">
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide pb-2">App</p>
-            <button
-              onClick={handleInstall}
-              disabled={installing}
-              className="w-full flex items-center justify-between py-3 text-left hover:text-pink-500 transition-colors disabled:hover:text-inherit disabled:cursor-default"
-            >
-              <div className="flex items-center gap-3">
-                <Smartphone className="h-5 w-5" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {installing ? 'Installing...' : 'Install SociaLens'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Add SociaLens to your home screen for quick access
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
           </CardContent>
         </Card>
       )}
