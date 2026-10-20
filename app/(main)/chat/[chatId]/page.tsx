@@ -48,6 +48,28 @@ export default function ChatRoomPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Keep the chat layout sized to the visible viewport on phones. In Android
+  // WebView, the keyboard can shrink the visual viewport without updating 100dvh.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const updateChatViewportHeight = () => {
+      const height = viewport?.height ?? window.innerHeight
+      document.documentElement.style.setProperty('--chat-viewport-height', `${height}px`)
+    }
+
+    updateChatViewportHeight()
+    viewport?.addEventListener('resize', updateChatViewportHeight)
+    window.addEventListener('resize', updateChatViewportHeight)
+    window.addEventListener('orientationchange', updateChatViewportHeight)
+
+    return () => {
+      viewport?.removeEventListener('resize', updateChatViewportHeight)
+      window.removeEventListener('resize', updateChatViewportHeight)
+      window.removeEventListener('orientationchange', updateChatViewportHeight)
+      document.documentElement.style.removeProperty('--chat-viewport-height')
+    }
+  }, [])
+
   const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, addPendingMessage, resolvePendingMessage, failPendingMessage, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
     useRealtimeMessages(chatId, user?.id ?? '')
   const { data: storyGroups = [] } = useActiveStories(user?.id)
@@ -319,7 +341,7 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] lg:h-[calc(100vh-3.5rem)] max-w-xl mx-auto">
+    <div className="relative flex flex-col h-[var(--chat-viewport-height,100dvh)] lg:h-[calc(100vh-3.5rem)] max-w-xl mx-auto">
       {showRestrictionPopup && (
         <RestrictionPopup feature="messaging" until={profile?.restrict_message_until} onClose={() => setShowRestrictionPopup(false)} />
       )}

@@ -311,7 +311,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const hasContent = !!message.trim() || !!attachedFile
 
   return (
-    <div className="border-t bg-background">
+    <div className="shrink-0 border-t bg-background">
       {replyingTo && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-muted/40">
           <div className="min-w-0">
