@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { spawn } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -37,6 +37,32 @@ async function processJob(job) {
   const inputPath = join(workDir, 'source')
   const outputPath = join(workDir, 'compatible.mp4')
   const outputObjectPath = `${job.owner_id}/compatible/${job.id}.mp4`
+  let leaseLost = false
+  const leaseHeartbeat = setInterval(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('video_processing_jobs')
+        .update({
+          locked_until: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id)
+        .eq('status', 'processing')
+        .eq('lease_token', job.lease_token)
+        .select('id')
+        .maybeSingle()
+
+      if (error) {
+        console.error('Could not renew video job lease:', job.id, error.message)
+      } else if (!data) {
+        leaseLost = true
+        console.error('Video job lease was reclaimed by another worker:', job.id)
+      }
+    } catch (error) {
+      console.error('Video job lease heartbeat failed:', job.id, error?.message || error)
+    }
+  }, 60_000)
+  leaseHeartbeat.unref?.()
 
   try {
     const { data: source, error: downloadError } = await supabase.storage
@@ -45,7 +71,7 @@ async function processJob(job) {
 
     const sourceBuffer = Buffer.from(await source.arrayBuffer())
     if (!sourceBuffer.length) throw new Error('Original video is empty')
-    await (await import('node:fs/promises')).writeFile(inputPath, sourceBuffer)
+    await writeFile(inputPath, sourceBuffer)
 
     const probeText = await run('ffprobe', [
       '-v', 'error', '-select_streams', 'v:0',
@@ -73,13 +99,13 @@ async function processJob(job) {
 
     const outputProbeText = await run('ffprobe', [
       '-v', 'error', '-show_entries',
-      'stream=codec_type,codec_name,profile,pix_fmt,width,height',
+      'stream=codec_type,codec_name,profile,level,pix_fmt,width,height',
       '-of', 'json', outputPath,
     ])
     const outputProbe = JSON.parse(outputProbeText)
     const video = outputProbe.streams?.find(stream => stream.codec_type === 'video')
     const audio = outputProbe.streams?.find(stream => stream.codec_type === 'audio')
-    if (!video || video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p') {
+    if (!video || video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p' || !String(video.profile || '').toLowerCase().includes('baseline') || video.level > 40) {
       throw new Error('Output validation failed: expected H.264 video with yuv420p pixels')
     }
     if (video.width > 1920 || video.height > 1080) {
@@ -89,6 +115,8 @@ async function processJob(job) {
       throw new Error('Output validation failed: expected AAC-LC audio')
     }
 
+    if (leaseLost) throw new Error('Processing lease was reclaimed; stopping stale worker')
+
     const outputBuffer = await readFile(outputPath)
     const { error: uploadError } = await supabase.storage.from(job.bucket).upload(
       outputObjectPath,
@@ -97,33 +125,38 @@ async function processJob(job) {
     )
     if (uploadError) throw uploadError
 
-    const { error: updateError } = await supabase.from('video_processing_jobs').update({
+    const { data: completedJob, error: updateError } = await supabase.from('video_processing_jobs').update({
       status: 'ready',
       playback_path: outputObjectPath,
       source_bytes: sourceBuffer.length,
       output_bytes: outputBuffer.length,
       completed_at: new Date().toISOString(),
       locked_until: null,
+      lease_token: null,
       updated_at: new Date().toISOString(),
       last_error: null,
-    }).eq('id', job.id).eq('status', 'processing')
+    }).eq('id', job.id).eq('status', 'processing').eq('lease_token', job.lease_token).select('id').maybeSingle()
     if (updateError) throw updateError
+    if (!completedJob) throw new Error('Processing lease was reclaimed before completion')
 
     console.log(JSON.stringify({ event: 'video_ready', jobId: job.id, sourceBytes: sourceBuffer.length, outputBytes: outputBuffer.length }))
   } catch (error) {
     const message = String(error?.message || error).slice(0, 2000)
     const terminal = job.attempts >= job.max_attempts
     const delaySeconds = Math.min(300, 15 * (2 ** Math.max(0, job.attempts - 1)))
-    const { error: updateError } = await supabase.from('video_processing_jobs').update({
+    const { data: failedJob, error: updateError } = await supabase.from('video_processing_jobs').update({
       status: terminal ? 'failed' : 'queued',
       available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
       locked_until: null,
+      lease_token: null,
       updated_at: new Date().toISOString(),
       last_error: message,
-    }).eq('id', job.id).eq('status', 'processing')
+    }).eq('id', job.id).eq('status', 'processing').eq('lease_token', job.lease_token).select('id').maybeSingle()
     if (updateError) console.error('Could not record failed job', job.id, updateError.message)
+    else if (!failedJob) console.error('Could not update failed job because this worker no longer owns its lease', job.id)
     console.error(JSON.stringify({ event: 'video_failed', jobId: job.id, attempt: job.attempts, terminal, error: message }))
   } finally {
+    clearInterval(leaseHeartbeat)
     await rm(workDir, { recursive: true, force: true })
   }
 }
