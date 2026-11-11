@@ -244,6 +244,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             poster={BLANK_VIDEO_POSTER}
             onLoadedMetadata={handleVideoMetadata}
             onError={handleVideoError}
+            onStalled={handleVideoError}
             className="w-full"
             style={{ maxHeight: '480px', objectFit: 'contain' }}
           />
