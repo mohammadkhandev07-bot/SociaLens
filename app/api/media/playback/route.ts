@@ -57,15 +57,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Legacy uploads predate this pipeline; preserve their existing playback URL.
-    if (!job) return NextResponse.json({ status: 'untracked', playbackUrl: rawUrl })
+    if (!job) return NextResponse.json({ status: 'untracked', playbackUrl: rawUrl }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 
     if (job.status === 'ready' && job.playback_path) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(job.playback_path)
-      return NextResponse.json({ status: 'ready', playbackUrl: data.publicUrl })
+      return NextResponse.json({ status: 'ready', playbackUrl: data.publicUrl }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
     }
 
     return NextResponse.json({ status: job.status, playbackUrl: null }, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
     })
   } catch (error) {
     console.error('Video playback status endpoint failed:', error)
