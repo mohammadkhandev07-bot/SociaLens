@@ -5,9 +5,9 @@ This isolated Docker worker converts uploaded post videos into a separate Androi
 ## Output profile
 
 - MP4 container with `moov` metadata moved to the beginning (`faststart`) for progressive playback.
-- H.264 AVC Baseline, level 4.0, `yuv420p`.
-- Aspect ratio preserved; landscape output is capped at 1920 px wide and portrait output at 1080 px high.
-- 30 fps output, AAC-LC stereo audio where an audio stream exists.
+- H.264 AVC Baseline, level 3.1, `yuv420p`.
+- Aspect ratio preserved; the longest output edge is capped at 1280 px (720p-class portrait/landscape).
+- 30 fps output with a 2 Mbps video peak bitrate and 4 Mbps VBV buffer for slower connections; AAC-LC stereo audio where an audio stream exists.
 - Output is validated with ffprobe before it is uploaded and marked ready.
 
 ## Required secrets
