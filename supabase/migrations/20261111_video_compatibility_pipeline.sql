@@ -58,7 +58,7 @@ returns setof public.video_processing_jobs
 language plpgsql
 security invoker
 set search_path = ''
-as $
+as $$
 begin
   -- A worker may be killed without running its error handler. Once its lease
   -- expires, make exhausted jobs terminal instead of leaving them stuck.
