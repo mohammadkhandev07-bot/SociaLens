@@ -31,19 +31,13 @@ create index if not exists video_processing_jobs_owner_idx
 
 alter table public.video_processing_jobs enable row level security;
 
-drop policy if exists "Users can enqueue their own video processing jobs" on public.video_processing_jobs;
-create policy "Users can enqueue their own video processing jobs"
-  on public.video_processing_jobs for insert to authenticated
-  with check (owner_id = (select auth.uid()) and status = 'queued'
-    and playback_path is null and attempts = 0);
-
 drop policy if exists "Authenticated users can read video processing status" on public.video_processing_jobs;
 create policy "Authenticated users can read video processing status"
   on public.video_processing_jobs for select to authenticated
   using (true);
 
-revoke update, delete on public.video_processing_jobs from anon, authenticated;
-grant select, insert on public.video_processing_jobs to authenticated;
+revoke insert, update, delete on public.video_processing_jobs from anon, authenticated;
+grant select on public.video_processing_jobs to authenticated;
 grant all on public.video_processing_jobs to service_role;
 
 create or replace function public.claim_video_processing_jobs(p_limit integer default 2)
