@@ -14,21 +14,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing or invalid media URL' }, { status: 400 })
   }
 
+  let input: URL
+  let project: URL
   try {
-    const input = new URL(rawUrl)
-    const project = new URL(SUPABASE_URL)
-    const prefix = '/storage/v1/object/public/'
-    if (input.protocol !== 'https:' || input.host !== project.host || !input.pathname.startsWith(prefix)) {
-      return NextResponse.json({ error: 'Unsupported media URL' }, { status: 400 })
-    }
+    input = new URL(rawUrl)
+    project = new URL(SUPABASE_URL)
+  } catch {
+    return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 })
+  }
 
+  const prefix = '/storage/v1/object/public/'
+  if (input.protocol !== 'https:' || input.host !== project.host || !input.pathname.startsWith(prefix)) {
+    return NextResponse.json({ error: 'Unsupported media URL' }, { status: 400 })
+  }
+
+  let bucket = ''
+  let originalPath = ''
+  try {
     const objectParts = input.pathname.slice(prefix.length).split('/')
-    const bucket = decodeURIComponent(objectParts.shift() || '')
-    const originalPath = objectParts.map(part => decodeURIComponent(part)).join('/')
-    if (bucket !== 'posts' || !originalPath || originalPath.includes('..')) {
-      return NextResponse.json({ error: 'Unsupported media object' }, { status: 400 })
-    }
+    bucket = decodeURIComponent(objectParts.shift() || '')
+    originalPath = objectParts.map(part => decodeURIComponent(part)).join('/')
+  } catch {
+    return NextResponse.json({ error: 'Invalid media object path' }, { status: 400 })
+  }
 
+  if (bucket !== 'posts' || !originalPath || originalPath.includes('..')) {
+    return NextResponse.json({ error: 'Unsupported media object' }, { status: 400 })
+  }
+
+  try {
     const admin = createAdminClient()
     const { data: job, error } = await admin
       .from('video_processing_jobs')
@@ -53,7 +67,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ status: job.status, playbackUrl: null }, {
       headers: { 'Cache-Control': 'no-store' },
     })
-  } catch {
-    return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 })
+  } catch (error) {
+    console.error('Video playback status endpoint failed:', error)
+    return NextResponse.json({ error: 'Could not check video processing status' }, { status: 503 })
   }
 }
