@@ -27,10 +27,13 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install FFmpeg
+      - name: Ensure FFmpeg is available
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -n 1
 
       - name: Install worker dependencies
         working-directory: video-worker
