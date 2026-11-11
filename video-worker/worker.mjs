@@ -140,6 +140,7 @@ async function processJob(job) {
     if (!completedJob) throw new Error('Processing lease was reclaimed before completion')
 
     console.log(JSON.stringify({ event: 'video_ready', jobId: job.id, sourceBytes: sourceBuffer.length, outputBytes: outputBuffer.length }))
+    return true
   } catch (error) {
     const message = String(error?.message || error).slice(0, 2000)
     const terminal = job.attempts >= job.max_attempts
@@ -155,6 +156,7 @@ async function processJob(job) {
     if (updateError) console.error('Could not record failed job', job.id, updateError.message)
     else if (!failedJob) console.error('Could not update failed job because this worker no longer owns its lease', job.id)
     console.error(JSON.stringify({ event: 'video_failed', jobId: job.id, attempt: job.attempts, terminal, error: message }))
+    return false
   } finally {
     clearInterval(leaseHeartbeat)
     await rm(workDir, { recursive: true, force: true })
@@ -196,7 +198,8 @@ while (!stopping) {
     continue
   }
 
-  await Promise.all(jobs.map(processJob))
+  const results = await Promise.all(jobs.map(processJob))
+  if (results.some(result => result === false)) process.exitCode = 1
   processedCount += jobs.length
 }
 
