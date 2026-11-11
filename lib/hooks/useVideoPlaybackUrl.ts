@@ -53,6 +53,11 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
           return
         }
 
+        // Keep playback available while the background rendition is being
+        // prepared. Compatible originals can start immediately; unsupported
+        // originals will switch to the validated rendition as soon as ready.
+        setPlaybackUrl(originalUrl)
+
         // Do not give up on slow conversions: keep checking while this video
         // remains near the viewport, with a capped interval to limit requests.
         attempts += 1
