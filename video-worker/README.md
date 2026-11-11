@@ -16,7 +16,7 @@ The repository includes `.github/workflows/video-processing.yml`. On the default
 
 Add these two **repository Actions secrets** in GitHub Settings → Secrets and variables → Actions:
 
-- `SUPABASE_URL`: the original SociaLens Supabase project URL.
+- `SUPABASE_URL`: `https://mhvlmmzfhbfmvgrxrqey.supabase.co` (the original SociaLens project URL).
 - `SUPABASE_SERVICE_ROLE_KEY`: the service-role secret for that same project.
 
 Never put the service-role key in source code, a committed `.env` file, Vercel client variables, or the Android app. Do not paste it into chat. GitHub Actions reads it only from the repository secret at runtime.
