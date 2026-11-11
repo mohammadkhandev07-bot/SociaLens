@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Resolves the transcoded rendition only while the video is eligible to load.
- * Pending jobs are polled with a bounded retry window; legacy and permanently
- * failed jobs retain the original URL so existing media is not broken.
+ * Resolves the compatible rendition only while a video is eligible to load.
+ * A queued conversion is polled until it becomes ready or fails; transient
+ * lookup failures temporarily fall back to the original without abandoning
+ * the background lookup, so a slow conversion can still replace it later.
  */
 export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enabled: boolean) {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
@@ -19,8 +20,13 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
     let attempts = 0
+    let consecutiveErrors = 0
 
     setPlaybackUrl(null)
+
+    const schedule = (delay: number) => {
+      if (!cancelled) timer = setTimeout(check, delay)
+    }
 
     const check = async () => {
       try {
@@ -32,6 +38,8 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
         const result = await response.json() as { status?: string; playbackUrl?: string | null }
 
         if (cancelled) return
+        consecutiveErrors = 0
+
         if (result.status === 'ready' && result.playbackUrl) {
           setPlaybackUrl(result.playbackUrl)
           return
@@ -44,21 +52,22 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
           setPlaybackUrl(originalUrl)
           return
         }
+
+        // Do not give up on slow conversions: keep checking while this video
+        // remains near the viewport, with a capped interval to limit requests.
+        attempts += 1
+        schedule(Math.min(15_000, 3_000 + attempts * 1_000))
       } catch {
         if (cancelled) return
-        // Transient API/network failures get a few retries before falling back.
-        if (attempts >= 3) {
+        consecutiveErrors += 1
+        if (consecutiveErrors >= 4) {
+          // Keep the video usable while the API recovers; a later successful
+          // status check can still switch playback to the compatible rendition.
           setPlaybackUrl(originalUrl)
-          return
         }
+        if (consecutiveErrors >= 20) return
+        schedule(Math.min(15_000, 3_000 * consecutiveErrors))
       }
-
-      attempts += 1
-      if (attempts >= 20) {
-        setPlaybackUrl(originalUrl)
-        return
-      }
-      timer = setTimeout(check, 3000)
     }
 
     void check()
