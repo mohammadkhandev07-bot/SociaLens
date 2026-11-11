@@ -122,18 +122,23 @@ export function PostCard({ post, onDelete }: PostCardProps) {
     const videoEl = videoRef.current
     const directSrc = playbackUrl
     const src = directSrc && usingMediaProxy ? getMediaProxyUrl(directSrc) : directSrc
-    if (!videoEl || !src || post.media_type !== 'video') return
+    if (!videoEl || post.media_type !== 'video') return
 
-    if (videoNearViewport) {
-      if (videoEl.getAttribute('src') !== src) {
-        videoEl.setAttribute('src', src)
-        firstFrameShownRef.current = false
-        videoEl.load()
+    // The playback hook clears its URL as soon as the card leaves the
+    // preload window. Detach the old source even when src is now empty.
+    if (!videoNearViewport || !src) {
+      if (videoEl.getAttribute('src')) {
+        try { videoEl.pause() } catch {}
+        videoEl.removeAttribute('src')
+        videoEl.load() // releases the decoder and any in-flight range requests
       }
-    } else if (videoEl.getAttribute('src')) {
-      try { videoEl.pause() } catch {}
-      videoEl.removeAttribute('src')
-      videoEl.load() // releases the decoder and any in-flight range requests
+      return
+    }
+
+    if (videoEl.getAttribute('src') !== src) {
+      videoEl.setAttribute('src', src)
+      firstFrameShownRef.current = false
+      videoEl.load()
     }
   }, [videoNearViewport, playbackUrl, post.media_type, usingMediaProxy])
 
