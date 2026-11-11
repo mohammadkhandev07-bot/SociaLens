@@ -6,13 +6,13 @@ This worker converts uploaded post videos into a separate Android-friendly MP4 r
 
 - MP4 container with `moov` metadata moved to the beginning (`faststart`) for progressive playback.
 - H.264 AVC Baseline, level 3.1, `yuv420p`.
-- Aspect ratio preserved; the longest output edge is capped at 1280 px (720p-class portrait/landscape).
+- Aspect ratio preserved; portrait is capped at 720×1280 and landscape at 1280×720. Square sources are fitted inside the same 720p-class frame-size budget so the H.264 Level 3.1 constraint is not exceeded.
 - 30 fps output with a 2 Mbps video peak bitrate and 4 Mbps VBV buffer; AAC-LC stereo audio where an audio stream exists.
-- Output is validated with ffprobe before it is uploaded and marked ready.
+- Output is validated with ffprobe before it is uploaded and marked ready. Validation checks H.264 Baseline/Level 3.1, yuv420p, frame-size limits, and AAC-LC stereo audio.
 
 ## Free GitHub Actions setup
 
-The repository includes `.github/workflows/video-processing.yml`. On the default branch, it checks the queue every five minutes and can also be started manually from the Actions tab.
+The repository includes `.github/workflows/video-processing.yml`. On the default branch, it checks the queue every five minutes and can also be started manually from the Actions tab. A separate `.github/workflows/video-worker-validation.yml` runs on pull requests without exposing any Supabase secrets; it checks worker syntax and transcodes portrait, landscape, and square test clips.
 
 Add these two **repository Actions secrets** in GitHub Settings → Secrets and variables → Actions:
 
@@ -25,7 +25,7 @@ The workflow uses a standard GitHub-hosted Ubuntu runner. Standard runners are f
 
 ### Processing timing and limits
 
-- The workflow is scheduled every five minutes. A newly uploaded video is queued immediately, but conversion starts on the next scheduled run, not necessarily at the exact upload moment.
+- The workflow is scheduled every five minutes. A newly uploaded video is queued immediately, but conversion starts on the next scheduled run, not necessarily at the exact upload moment. GitHub may delay scheduled runs, and public-repository schedules are automatically disabled after 60 days without repository activity.
 - GitHub scheduled workflows can be delayed during high load. The workflow can also be started manually.
 - GitHub automatically disables scheduled workflows in public repositories after 60 days without repository activity; a maintainer must re-enable the schedule if that happens.
 - Each run processes at most two jobs, one at a time, to keep resource use controlled. Additional queued videos are picked up by later runs.
