@@ -30,35 +30,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid video object' }, { status: 400 })
   }
 
-  const admin = createAdminClient()
-  const { data: files, error: storageError } = await admin.storage
-    .from('posts')
-    .list(user.id, { search: parts[1], limit: 100 })
+  try {
+    const admin = createAdminClient()
+    const { data: files, error: storageError } = await admin.storage
+      .from('posts')
+      .list(user.id, { search: parts[1], limit: 100 })
 
-  if (storageError) {
-    console.error('Could not verify uploaded video object:', storageError.message)
-    return NextResponse.json({ error: 'Could not verify uploaded video' }, { status: 503 })
-  }
+    if (storageError) throw storageError
+    if (!files?.some(file => file.name === parts[1])) {
+      return NextResponse.json({ error: 'Uploaded video was not found' }, { status: 404 })
+    }
 
-  if (!files?.some(file => file.name === parts[1])) {
-    return NextResponse.json({ error: 'Uploaded video was not found' }, { status: 404 })
-  }
+    const { error: queueError } = await admin.from('video_processing_jobs').upsert(
+      {
+        owner_id: user.id,
+        bucket: 'posts',
+        original_path: objectPath,
+        status: 'queued',
+        source_bytes: sourceBytes,
+      },
+      { onConflict: 'bucket,original_path', ignoreDuplicates: true },
+    )
 
-  const { error: queueError } = await admin.from('video_processing_jobs').upsert(
-    {
-      owner_id: user.id,
-      bucket: 'posts',
-      original_path: objectPath,
-      status: 'queued',
-      source_bytes: sourceBytes,
-    },
-    { onConflict: 'bucket,original_path', ignoreDuplicates: true },
-  )
-
-  if (queueError) {
-    console.error('Could not register uploaded video for processing:', queueError.message)
+    if (queueError) throw queueError
+    return NextResponse.json({ status: 'queued' }, { status: 202 })
+  } catch (error) {
+    console.error('Could not register uploaded video for processing:', error)
     return NextResponse.json({ error: 'Could not queue video processing' }, { status: 503 })
   }
-
-  return NextResponse.json({ status: 'queued' }, { status: 202 })
 }
