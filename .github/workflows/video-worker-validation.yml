@@ -1,0 +1,44 @@
+name: Video worker validation
+
+on:
+  pull_request:
+    paths:
+      - "video-worker/**"
+      - "components/feed/PostCard.tsx"
+      - "components/reels/ReelCard.tsx"
+      - "app/api/media/**"
+      - "lib/hooks/useVideoPlaybackUrl.ts"
+      - "supabase/migrations/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-video-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Install worker dependencies
+        working-directory: video-worker
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Check worker JavaScript syntax
+        working-directory: video-worker
+        run: node --check worker.mjs
+
+      - name: Test portrait, landscape, and square conversion profiles
+        run: bash video-worker/test-ffmpeg.sh
