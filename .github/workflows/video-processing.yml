@@ -35,15 +35,18 @@ jobs:
           node-version: "20"
 
       - name: Ensure FFmpeg is available
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1; then
-            echo "FFmpeg is missing; refreshing Ubuntu package lists with network timeouts."
+            echo "FFmpeg is missing; installing with extended network timeouts and retries."
             sudo timeout 6m apt-get update -qq \
-              -o Acquire::http::Timeout=20 \
-              -o Acquire::https::Timeout=20 \
-              -o Acquire::Retries=1
-            sudo timeout 3m apt-get install --yes --no-install-recommends ffmpeg
+              -o Acquire::http::Timeout=45 \
+              -o Acquire::https::Timeout=45 \
+              -o Acquire::Retries=2
+            sudo timeout 12m apt-get install --yes --no-install-recommends \
+              -o Acquire::http::Timeout=60 \
+              -o Acquire::https::Timeout=60 \
+              -o Acquire::Retries=3 ffmpeg
           fi
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
