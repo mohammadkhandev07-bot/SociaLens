@@ -61,19 +61,20 @@ export async function POST(request: NextRequest) {
   // Only feed/reel videos are queued. The original object is retained unchanged.
   // Conversion runs in a separate worker, never inside this Vercel request.
   if (bucket === 'posts' && file.type.startsWith('video/')) {
-    const admin = createAdminClient()
-    const { error: queueError } = await admin.from('video_processing_jobs').insert({
-      owner_id: user.id,
-      bucket,
-      original_path: path,
-      status: 'queued',
-      source_bytes: file.size,
-    })
-
-    if (queueError) {
+    try {
+      const admin = createAdminClient()
+      const { error: queueError } = await admin.from('video_processing_jobs').insert({
+        owner_id: user.id,
+        bucket,
+        original_path: path,
+        status: 'queued',
+        source_bytes: file.size,
+      })
+      if (queueError) throw queueError
+    } catch (queueError) {
       // Avoid leaving an uploaded video that can never receive its rendition.
       await supabase.storage.from(bucket).remove([path])
-      console.error('Could not enqueue video compatibility job:', queueError.message)
+      console.error('Could not enqueue video compatibility job:', queueError)
       return NextResponse.json(
         { error: 'Video upload could not be queued. Please retry.' },
         { status: 503 },
