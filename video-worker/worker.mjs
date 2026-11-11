@@ -86,11 +86,11 @@ async function processJob(job) {
       '-i', inputPath,
       '-map', '0:v:0', '-map', '0:a:0?',
       '-sn', '-dn',
-      '-vf', "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+      '-vf', "scale=w='min(1280,iw)':h='min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
       '-r', '30',
-      '-c:v', 'libx264', '-profile:v', 'baseline', '-level:v', '4.0',
+      '-c:v', 'libx264', '-profile:v', 'baseline', '-level:v', '3.1',
       '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
-      '-maxrate', '6M', '-bufsize', '12M',
+      '-maxrate', '2M', '-bufsize', '4M',
       '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
       '-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', '128k', '-ac', '2', '-ar', '48000',
       '-movflags', '+faststart',
@@ -105,11 +105,11 @@ async function processJob(job) {
     const outputProbe = JSON.parse(outputProbeText)
     const video = outputProbe.streams?.find(stream => stream.codec_type === 'video')
     const audio = outputProbe.streams?.find(stream => stream.codec_type === 'audio')
-    if (!video || video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p' || !String(video.profile || '').toLowerCase().includes('baseline') || video.level > 40) {
+    if (!video || video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p' || !String(video.profile || '').toLowerCase().includes('baseline') || video.level > 31) {
       throw new Error('Output validation failed: expected H.264 video with yuv420p pixels')
     }
-    if (video.width > 1920 || video.height > 1080) {
-      throw new Error('Output validation failed: rendition exceeds 1920x1080')
+    if (Math.max(video.width, video.height) > 1280) {
+      throw new Error('Output validation failed: rendition exceeds 1280 pixels on its longest edge')
     }
     if (audio && (audio.codec_name !== 'aac' || audio.profile !== 'LC')) {
       throw new Error('Output validation failed: expected AAC-LC audio')
