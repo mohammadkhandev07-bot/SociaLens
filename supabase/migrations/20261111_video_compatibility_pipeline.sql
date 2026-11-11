@@ -1,0 +1,90 @@
+-- SociaLens Android-compatible video processing pipeline.
+-- Apply this migration before deploying the upload route or starting the worker.
+
+create table if not exists public.video_processing_jobs (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  bucket text not null check (bucket in ('posts')),
+  original_path text not null,
+  playback_path text,
+  status text not null default 'queued'
+    check (status in ('queued', 'processing', 'ready', 'failed')),
+  attempts integer not null default 0 check (attempts >= 0),
+  max_attempts integer not null default 5 check (max_attempts between 1 and 10),
+  available_at timestamptz not null default now(),
+  locked_until timestamptz,
+  last_error text,
+  source_bytes bigint,
+  output_bytes bigint,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz,
+  constraint video_processing_jobs_source_unique unique (bucket, original_path)
+);
+
+create index if not exists video_processing_jobs_claim_idx
+  on public.video_processing_jobs (status, available_at, created_at)
+  where status in ('queued', 'processing');
+
+create index if not exists video_processing_jobs_owner_idx
+  on public.video_processing_jobs (owner_id, created_at desc);
+
+alter table public.video_processing_jobs enable row level security;
+
+drop policy if exists "Users can enqueue their own video processing jobs" on public.video_processing_jobs;
+create policy "Users can enqueue their own video processing jobs"
+  on public.video_processing_jobs for insert to authenticated
+  with check (owner_id = (select auth.uid()) and status = 'queued'
+    and playback_path is null and attempts = 0);
+
+drop policy if exists "Authenticated users can read video processing status" on public.video_processing_jobs;
+create policy "Authenticated users can read video processing status"
+  on public.video_processing_jobs for select to authenticated
+  using (true);
+
+revoke update, delete on public.video_processing_jobs from anon, authenticated;
+grant select, insert on public.video_processing_jobs to authenticated;
+grant all on public.video_processing_jobs to service_role;
+
+create or replace function public.claim_video_processing_jobs(p_limit integer default 2)
+returns setof public.video_processing_jobs
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'service_role required';
+  end if;
+
+  return query
+  with candidates as (
+    select id
+    from public.video_processing_jobs
+    where attempts < max_attempts
+      and available_at <= now()
+      and (
+        status = 'queued'
+        or (status = 'processing' and locked_until < now())
+      )
+    order by created_at
+    for update skip locked
+    limit greatest(1, least(coalesce(p_limit, 2), 10))
+  )
+  update public.video_processing_jobs as jobs
+  set status = 'processing',
+      attempts = jobs.attempts + 1,
+      locked_until = now() + interval '10 minutes',
+      updated_at = now(),
+      last_error = null
+  from candidates
+  where jobs.id = candidates.id
+  returning jobs.*;
+end;
+$$;
+
+revoke all on function public.claim_video_processing_jobs(integer) from public, anon, authenticated;
+grant execute on function public.claim_video_processing_jobs(integer) to service_role;
+
+comment on table public.video_processing_jobs is
+  'Durable queue and rendition status for Android-compatible MP4 playback copies. Original uploads are never overwritten.';
