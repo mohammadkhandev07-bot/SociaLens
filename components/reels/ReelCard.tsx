@@ -251,6 +251,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         onClick={handleTap}
         onTimeUpdate={handleTimeUpdate}
         onError={handleVideoError}
+        onStalled={handleVideoError}
         className="absolute inset-0 w-full h-full object-cover" />
 
       {paused && (
