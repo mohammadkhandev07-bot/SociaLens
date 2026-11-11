@@ -35,12 +35,18 @@ jobs:
           node-version: "20"
 
       - name: Ensure FFmpeg is available
+        timeout-minutes: 10
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install --yes --no-install-recommends ffmpeg
+            echo "FFmpeg is missing; refreshing Ubuntu package lists with network timeouts."
+            sudo timeout 6m apt-get update -qq \
+              -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 \
+              -o Acquire::Retries=1
+            sudo timeout 3m apt-get install --yes --no-install-recommends ffmpeg
           fi
           ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
 
       - name: Install worker dependencies
         working-directory: video-worker
