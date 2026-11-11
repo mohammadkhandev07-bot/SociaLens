@@ -29,6 +29,20 @@ create index if not exists video_processing_jobs_claim_idx
 create index if not exists video_processing_jobs_owner_idx
   on public.video_processing_jobs (owner_id, created_at desc);
 
+-- Queue existing Supabase-hosted post/reel videos as well, so the known
+-- failing upload is eligible for conversion after this migration is applied.
+insert into public.video_processing_jobs (owner_id, bucket, original_path, status)
+select
+  p.user_id,
+  'posts',
+  regexp_replace(p.media_url, '^.*/storage/v1/object/public/posts/', ''),
+  'queued'
+from public.posts as p
+where p.media_type = 'video'
+  and p.media_url like '%/storage/v1/object/public/posts/%'
+  and regexp_replace(p.media_url, '^.*/storage/v1/object/public/posts/', '') <> ''
+on conflict (bucket, original_path) do nothing;
+
 alter table public.video_processing_jobs enable row level security;
 
 drop policy if exists "Authenticated users can read video processing status" on public.video_processing_jobs;
