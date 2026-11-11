@@ -31,7 +31,7 @@ The worker is intentionally not run in a Vercel request. Scale worker replicas g
 
 ## Important rollout notes
 
-- Existing videos are not automatically backfilled. Re-upload or enqueue them through a separately reviewed backfill operation.
+- The migration queues existing Supabase public-storage post videos for backfill. Monitor the initial queue depth and scale worker capacity gradually before applying it to a large production library.
 - A pending conversion is not served as if it were ready. The client waits for the rendition and uses the original only for legacy/untracked or permanently failed jobs.
 - This PR does not provision a paid worker host or expose service-role secrets. Worker deployment and migration application are explicit production rollout steps.
 - Validate on representative physical Android devices before treating this as a verified fix.
