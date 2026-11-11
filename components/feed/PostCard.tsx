@@ -19,6 +19,7 @@ import { PostWithProfile } from '@/lib/types/database.types'
 import { formatTimeAgo, formatCount, getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
@@ -44,6 +45,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const firstFrameShownRef = useRef(false)
   const [videoNearViewport, setVideoNearViewport] = useState(false)
   const [usingMediaProxy, setUsingMediaProxy] = useState(false)
+  const playbackUrl = useVideoPlaybackUrl(post.media_url, videoNearViewport && post.media_type === 'video')
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
@@ -118,22 +120,27 @@ export function PostCard({ post, onDelete }: PostCardProps) {
 
   useEffect(() => {
     const videoEl = videoRef.current
-    const directSrc = post.media_url
+    const directSrc = playbackUrl
     const src = directSrc && usingMediaProxy ? getMediaProxyUrl(directSrc) : directSrc
-    if (!videoEl || !src || post.media_type !== 'video') return
+    if (!videoEl || post.media_type !== 'video') return
 
-    if (videoNearViewport) {
-      if (videoEl.getAttribute('src') !== src) {
-        videoEl.setAttribute('src', src)
-        firstFrameShownRef.current = false
-        videoEl.load()
+    // The playback hook clears its URL as soon as the card leaves the
+    // preload window. Detach the old source even when src is now empty.
+    if (!videoNearViewport || !src) {
+      if (videoEl.getAttribute('src')) {
+        try { videoEl.pause() } catch {}
+        videoEl.removeAttribute('src')
+        videoEl.load() // releases the decoder and any in-flight range requests
       }
-    } else if (videoEl.getAttribute('src')) {
-      try { videoEl.pause() } catch {}
-      videoEl.removeAttribute('src')
-      videoEl.load() // releases the decoder and any in-flight range requests
+      return
     }
-  }, [videoNearViewport, post.media_url, post.media_type, usingMediaProxy])
+
+    if (videoEl.getAttribute('src') !== src) {
+      videoEl.setAttribute('src', src)
+      firstFrameShownRef.current = false
+      videoEl.load()
+    }
+  }, [videoNearViewport, playbackUrl, post.media_type, usingMediaProxy])
 
   // preload="metadata" fetches the duration but never decodes a frame, so in
   // Android WebView the element stayed empty (and got WebView's own grey
@@ -141,7 +148,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   // frame to be decoded and presented - that frame becomes the thumbnail,
   // with no stored poster image needed anywhere.
   const handleVideoError = () => {
-    if (!usingMediaProxy && post.media_url) setUsingMediaProxy(true)
+    if (!usingMediaProxy && playbackUrl) setUsingMediaProxy(true)
   }
 
   const handleVideoMetadata = () => {
@@ -242,6 +249,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             poster={BLANK_VIDEO_POSTER}
             onLoadedMetadata={handleVideoMetadata}
             onError={handleVideoError}
+            onStalled={handleVideoError}
             className="w-full"
             style={{ maxHeight: '480px', objectFit: 'contain' }}
           />

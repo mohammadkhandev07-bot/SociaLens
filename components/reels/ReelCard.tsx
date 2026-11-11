@@ -15,6 +15,7 @@ import { PostWithProfile } from '@/lib/types/database.types'
 import { formatCount, getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
@@ -50,6 +51,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const { user, profile } = useUser()
   const supabase = createClient()
   const track = useTrackEvent()
+  const playbackUrl = useVideoPlaybackUrl(post.media_url, shouldLoad)
   const watchedSecondsRef = useRef(0)
   const watchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const loopCountRef = useRef(0)
@@ -78,7 +80,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   useEffect(() => {
     const videoEl = videoRef.current
     if (!videoEl) return
-    const directSrc = post.media_url ?? ''
+    const directSrc = playbackUrl ?? ''
     const src = usingMediaProxy && directSrc ? getMediaProxyUrl(directSrc) : directSrc
 
     if (shouldLoad && src) {
@@ -93,7 +95,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
       setProgress(0)
       setPaused(false)
     }
-  }, [shouldLoad, post.media_url, usingMediaProxy])
+  }, [shouldLoad, playbackUrl, usingMediaProxy])
 
   useEffect(() => {
     setUsingMediaProxy(false)
@@ -153,7 +155,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   }, [post.id, user?.id])
 
   const handleVideoError = () => {
-    if (!usingMediaProxy && post.media_url) {
+    if (!usingMediaProxy && playbackUrl) {
       setUsingMediaProxy(true)
     }
   }
@@ -249,6 +251,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         onClick={handleTap}
         onTimeUpdate={handleTimeUpdate}
         onError={handleVideoError}
+        onStalled={handleVideoError}
         className="absolute inset-0 w-full h-full object-cover" />
 
       {paused && (

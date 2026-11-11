@@ -264,6 +264,23 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
           upsert: false,
         })
         if (error) throw error
+
+        // This flow uploads directly to Supabase Storage (not /api/upload),
+        // so explicitly register video objects with the server-side queue API.
+        if (mediaType === 'video') {
+          const registration = await fetch('/api/media/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ objectPath: path, sourceBytes: fileToUpload.size }),
+          })
+          const registrationResult = await registration.json().catch(() => ({}))
+          if (!registration.ok) {
+            await supabase.storage.from('posts').remove([path])
+            throw new Error(registrationResult.error || 'Video processing could not be queued. Please retry.')
+          }
+        }
+
         setUploadProgress(80)
         const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
         media_url = urlData.publicUrl
