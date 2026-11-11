@@ -27,6 +27,7 @@ The workflow uses a standard GitHub-hosted Ubuntu runner. Standard runners are f
 
 - The workflow is scheduled every five minutes. A newly uploaded video is queued immediately, but conversion starts on the next scheduled run, not necessarily at the exact upload moment.
 - GitHub scheduled workflows can be delayed during high load. The workflow can also be started manually.
+- GitHub automatically disables scheduled workflows in public repositories after 60 days without repository activity; a maintainer must re-enable the schedule if that happens.
 - Each run processes at most two jobs, one at a time, to keep resource use controlled. Additional queued videos are picked up by later runs.
 - Failed jobs use the queue's bounded retry/backoff logic and are retried by a later run.
 - This is a free scheduled worker, not a continuously running server. Do not promise instant processing or unlimited throughput.
