@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const ALLOWED_BUCKETS = ['posts', 'avatars', 'covers', 'stories', 'chat-media', 'chat-wallpapers', 'appeals', 'contact-support'] as const
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime', 'audio/webm', 'audio/mpeg', 'audio/ogg']
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
   // Only feed/reel videos are queued. The original object is retained unchanged.
   // Conversion runs in a separate worker, never inside this Vercel request.
   if (bucket === 'posts' && file.type.startsWith('video/')) {
-    const { error: queueError } = await supabase.from('video_processing_jobs').insert({
+    const admin = createAdminClient()
+    const { error: queueError } = await admin.from('video_processing_jobs').insert({
       owner_id: user.id,
       bucket,
       original_path: path,
