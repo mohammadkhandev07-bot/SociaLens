@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -28,7 +29,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported media object' }, { status: 400 })
     }
 
-    const { data: job, error } = await supabase
+    const admin = createAdminClient()
+    const { data: job, error } = await admin
       .from('video_processing_jobs')
       .select('status, playback_path')
       .eq('bucket', bucket)
