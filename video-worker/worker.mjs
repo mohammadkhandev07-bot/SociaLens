@@ -1,0 +1,151 @@
+import { createClient } from '@supabase/supabase-js'
+import { spawn } from 'node:child_process'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+
+const supabaseUrl = process.env.SUPABASE_URL
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const pollMs = Number(process.env.POLL_INTERVAL_MS || 2500)
+const batchSize = Number(process.env.BATCH_SIZE || 2)
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+}
+
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
+
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', chunk => { stdout += chunk.toString() })
+    child.stderr.on('data', chunk => { stderr += chunk.toString() })
+    child.on('error', reject)
+    child.on('close', code => {
+      if (code === 0) resolve(stdout)
+      else reject(new Error(`${command} exited with ${code}: ${stderr.slice(-4000)}`))
+    })
+  })
+}
+
+async function processJob(job) {
+  const workDir = await mkdtemp(join(tmpdir(), 'socialens-video-'))
+  const inputPath = join(workDir, 'source')
+  const outputPath = join(workDir, 'compatible.mp4')
+  const outputObjectPath = `${job.owner_id}/compatible/${job.id}.mp4`
+
+  try {
+    const { data: source, error: downloadError } = await supabase.storage
+      .from(job.bucket).download(job.original_path)
+    if (downloadError || !source) throw downloadError || new Error('Original video download returned no data')
+
+    const sourceBuffer = Buffer.from(await source.arrayBuffer())
+    if (!sourceBuffer.length) throw new Error('Original video is empty')
+    await (await import('node:fs/promises')).writeFile(inputPath, sourceBuffer)
+
+    const probeText = await run('ffprobe', [
+      '-v', 'error', '-select_streams', 'v:0',
+      '-show_entries', 'stream=codec_name,width,height',
+      '-of', 'json', inputPath,
+    ])
+    const probe = JSON.parse(probeText)
+    if (!probe.streams?.length) throw new Error('Uploaded file contains no video stream')
+
+    await run('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-i', inputPath,
+      '-map', '0:v:0', '-map', '0:a:0?',
+      '-sn', '-dn',
+      '-vf', "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+      '-r', '30',
+      '-c:v', 'libx264', '-profile:v', 'baseline', '-level:v', '4.0',
+      '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
+      '-maxrate', '6M', '-bufsize', '12M',
+      '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
+      '-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', '128k', '-ac', '2', '-ar', '48000',
+      '-movflags', '+faststart',
+      outputPath,
+    ])
+
+    const outputProbeText = await run('ffprobe', [
+      '-v', 'error', '-show_entries',
+      'stream=codec_type,codec_name,profile,pix_fmt,width,height',
+      '-of', 'json', outputPath,
+    ])
+    const outputProbe = JSON.parse(outputProbeText)
+    const video = outputProbe.streams?.find(stream => stream.codec_type === 'video')
+    const audio = outputProbe.streams?.find(stream => stream.codec_type === 'audio')
+    if (!video || video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p') {
+      throw new Error('Output validation failed: expected H.264 video with yuv420p pixels')
+    }
+    if (video.width > 1920 || video.height > 1080) {
+      throw new Error('Output validation failed: rendition exceeds 1920x1080')
+    }
+    if (audio && (audio.codec_name !== 'aac' || audio.profile !== 'LC')) {
+      throw new Error('Output validation failed: expected AAC-LC audio')
+    }
+
+    const outputBuffer = await readFile(outputPath)
+    const { error: uploadError } = await supabase.storage.from(job.bucket).upload(
+      outputObjectPath,
+      outputBuffer,
+      { contentType: 'video/mp4', cacheControl: '31536000', upsert: true },
+    )
+    if (uploadError) throw uploadError
+
+    const { error: updateError } = await supabase.from('video_processing_jobs').update({
+      status: 'ready',
+      playback_path: outputObjectPath,
+      source_bytes: sourceBuffer.length,
+      output_bytes: outputBuffer.length,
+      completed_at: new Date().toISOString(),
+      locked_until: null,
+      updated_at: new Date().toISOString(),
+      last_error: null,
+    }).eq('id', job.id).eq('status', 'processing')
+    if (updateError) throw updateError
+
+    console.log(JSON.stringify({ event: 'video_ready', jobId: job.id, sourceBytes: sourceBuffer.length, outputBytes: outputBuffer.length }))
+  } catch (error) {
+    const message = String(error?.message || error).slice(0, 2000)
+    const terminal = job.attempts >= job.max_attempts
+    const delaySeconds = Math.min(300, 15 * (2 ** Math.max(0, job.attempts - 1)))
+    const { error: updateError } = await supabase.from('video_processing_jobs').update({
+      status: terminal ? 'failed' : 'queued',
+      available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
+      locked_until: null,
+      updated_at: new Date().toISOString(),
+      last_error: message,
+    }).eq('id', job.id).eq('status', 'processing')
+    if (updateError) console.error('Could not record failed job', job.id, updateError.message)
+    console.error(JSON.stringify({ event: 'video_failed', jobId: job.id, attempt: job.attempts, terminal, error: message }))
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
+let stopping = false
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => { stopping = true })
+}
+
+console.log('SociaLens video worker started')
+while (!stopping) {
+  const { data: jobs, error } = await supabase.rpc('claim_video_processing_jobs', { p_limit: batchSize })
+  if (error) {
+    console.error('Queue claim failed:', error.message)
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+    continue
+  }
+  if (!jobs?.length) {
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+    continue
+  }
+  await Promise.all(jobs.map(processJob))
+}
+console.log('SociaLens video worker stopped')
