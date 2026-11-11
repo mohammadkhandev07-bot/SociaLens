@@ -13,6 +13,7 @@ create table if not exists public.video_processing_jobs (
   max_attempts integer not null default 5 check (max_attempts between 1 and 10),
   available_at timestamptz not null default now(),
   locked_until timestamptz,
+  lease_token uuid,
   last_error text,
   source_bytes bigint,
   output_bytes bigint,
@@ -46,25 +47,19 @@ on conflict (bucket, original_path) do nothing;
 alter table public.video_processing_jobs enable row level security;
 
 drop policy if exists "Authenticated users can read video processing status" on public.video_processing_jobs;
-create policy "Authenticated users can read video processing status"
-  on public.video_processing_jobs for select to authenticated
-  using (true);
 
-revoke insert, update, delete on public.video_processing_jobs from anon, authenticated;
-grant select on public.video_processing_jobs to authenticated;
+-- Internal queue: clients cannot enumerate jobs or inspect worker errors.
+-- The authenticated playback API reads status using the server-only service-role client.
+revoke all on public.video_processing_jobs from public, anon, authenticated;
 grant all on public.video_processing_jobs to service_role;
 
 create or replace function public.claim_video_processing_jobs(p_limit integer default 2)
 returns setof public.video_processing_jobs
 language plpgsql
-security definer
-set search_path = public, pg_temp
+security invoker
+set search_path = ''
 as $$
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'service_role required';
-  end if;
-
   return query
   with candidates as (
     select id
@@ -83,6 +78,7 @@ begin
   set status = 'processing',
       attempts = jobs.attempts + 1,
       locked_until = now() + interval '10 minutes',
+      lease_token = pg_catalog.gen_random_uuid(),
       updated_at = now(),
       last_error = null
   from candidates
