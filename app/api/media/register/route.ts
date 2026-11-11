@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     !parts[1] ||
     parts[1] === '.' ||
     parts[1] === '..' ||
-    !/\.(mp4|m4v|mov|webm)$/i.test(parts[1]) ||
+    !/\.(mp4|m4v|mov|webm|mkv|3gp|avi|mpg|mpeg|ts)$/i.test(parts[1]) ||
     !Number.isSafeInteger(sourceBytes) ||
     sourceBytes <= 0
   ) {
