@@ -1,0 +1,58 @@
+name: SociaLens video processing
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socialens-video-processing
+  cancel-in-progress: false
+
+jobs:
+  process-video-queue:
+    name: Convert queued videos
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUN_ONCE: "true"
+      MAX_JOBS_PER_RUN: "2"
+      BATCH_SIZE: "1"
+      POLL_INTERVAL_MS: "1000"
+
+    steps:
+      - name: Check out SociaLens
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Install worker dependencies
+        working-directory: video-worker
+        run: npm install --omit=dev
+
+      - name: Validate worker JavaScript
+        working-directory: video-worker
+        run: node --check worker.mjs
+
+      - name: Verify required secrets are configured
+        if: ${{ env.SUPABASE_URL == '' || env.SUPABASE_SERVICE_ROLE_KEY == '' }}
+        run: |
+          echo "::error::Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY under Settings > Secrets and variables > Actions."
+          exit 1
+
+      - name: Process queued videos
+        working-directory: video-worker
+        run: npm start
