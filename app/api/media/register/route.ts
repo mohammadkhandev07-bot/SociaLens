@@ -9,7 +9,11 @@ export async function POST(request: NextRequest) {
 
   let body: { objectPath?: unknown; sourceBytes?: unknown }
   try {
-    body = await request.json()
+    const parsed: unknown = await request.json()
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+    body = parsed as { objectPath?: unknown; sourceBytes?: unknown }
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
