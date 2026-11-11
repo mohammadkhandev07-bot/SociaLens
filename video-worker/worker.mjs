@@ -161,23 +161,43 @@ async function processJob(job) {
   }
 }
 
+const runOnce = process.env.RUN_ONCE === 'true'
+const maxJobsPerRun = Math.max(1, Math.min(10, Number(process.env.MAX_JOBS_PER_RUN || 2)))
+
 let stopping = false
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => { stopping = true })
 }
 
-console.log('SociaLens video worker started')
+console.log(JSON.stringify({
+  event: 'worker_started',
+  mode: runOnce ? 'run-once' : 'persistent',
+  batchSize,
+  maxJobsPerRun: runOnce ? maxJobsPerRun : null,
+}))
+
+let processedCount = 0
 while (!stopping) {
-  const { data: jobs, error } = await supabase.rpc('claim_video_processing_jobs', { p_limit: batchSize })
+  const remaining = runOnce ? maxJobsPerRun - processedCount : batchSize
+  if (runOnce && remaining <= 0) break
+
+  const claimLimit = runOnce ? Math.min(batchSize, remaining) : batchSize
+  const { data: jobs, error } = await supabase.rpc('claim_video_processing_jobs', { p_limit: claimLimit })
   if (error) {
     console.error('Queue claim failed:', error.message)
+    if (runOnce) process.exitCode = 1
     await new Promise(resolve => setTimeout(resolve, pollMs))
+    if (runOnce) break
     continue
   }
   if (!jobs?.length) {
+    if (runOnce) break
     await new Promise(resolve => setTimeout(resolve, pollMs))
     continue
   }
+
   await Promise.all(jobs.map(processJob))
+  processedCount += jobs.length
 }
-console.log('SociaLens video worker stopped')
+
+console.log(JSON.stringify({ event: 'worker_stopped', processedCount, stopping }))
