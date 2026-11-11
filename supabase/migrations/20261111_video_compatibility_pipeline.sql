@@ -51,7 +51,7 @@ drop policy if exists "Authenticated users can read video processing status" on 
 -- Internal queue: clients cannot enumerate jobs or inspect worker errors.
 -- The authenticated playback API reads status using the server-only service-role client.
 revoke all on public.video_processing_jobs from public, anon, authenticated;
-grant all on public.video_processing_jobs to service_role;
+grant select, insert, update, delete on public.video_processing_jobs to service_role;
 
 create or replace function public.claim_video_processing_jobs(p_limit integer default 2)
 returns setof public.video_processing_jobs
