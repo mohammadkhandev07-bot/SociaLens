@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
-import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
+import { interleaveSingleAd, dedupeById } from '@/lib/utils/adInsertion'
 import { useExplorePosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
@@ -41,7 +41,7 @@ export default function ExplorePage() {
     isFetchingNextPage: isFetchingMoreExplore,
   } = useExplorePosts(user?.id)
   const posts = explorePages?.pages.flatMap(page => page.posts) ?? []
-  const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
+  const exploreItems = useMemo(() => interleaveSingleAd(dedupeById(posts), 5), [posts])
   const supabase = createClient()
 
   const { data: searchProfiles = [] } = useQuery({
@@ -137,7 +137,7 @@ export default function ExplorePage() {
   })
 
   const isSearching = query.length > 1
-  const searchItems = useMemo(() => interleaveAds(dedupeById(searchPosts), 3, 8), [searchPosts])
+  const searchItems = useMemo(() => interleaveSingleAd(dedupeById(searchPosts), 5), [searchPosts])
 
   if (selectedHashtag) {
     return (
