@@ -10,7 +10,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
-import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
+import { interleaveSingleAd, dedupeById } from '@/lib/utils/adInsertion'
 
 export default function FeedPage() {
   const { user } = useUser()
@@ -19,11 +19,10 @@ export default function FeedPage() {
   const supabase = createClient()
   const queryClient = useQueryClient()
 
-  // Randomized gaps (3-8 posts apart) rather than a fixed "every 4th
-  // post" rhythm, so a sponsored post never falls into a noticeable
-  // pattern. Only recomputed when the actual post list changes, so ads
-  // Don't jump around position on every unrelated re-render.
-  const items = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
+  // One approved Native Banner code is available, so this feed batch
+  // contains at most one ad placement. Request distinct codes before
+  // adding more placements or repeating the unit.
+  const items = useMemo(() => interleaveSingleAd(dedupeById(posts), 5), [posts])
 
   const handleDeletePost = async (postId: string) => {
     if (!user) return
