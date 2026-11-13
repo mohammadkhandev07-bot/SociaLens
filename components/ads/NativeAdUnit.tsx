@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Only one Adsterra Native Banner code is currently approved for SociaLens.
- * Keep one live instance and use the provider's snippet directly in the page
- * body. Do not duplicate this fixed container ID or wrap the tag in an iframe.
+ * SociaLens currently has one approved Adsterra Native Banner code.
+ * The provider's snippet uses a fixed container ID, so only one instance
+ * may be mounted at a time. Render the snippet directly in the page body.
  */
 const AD_SCRIPT_SRC = 'https://bicea.org/21/881f5b6409710d9bc02f368e7ca74528'
 const AD_CONTAINER_ID = 'container-881f5b6409710d9bc02f368e7ca74528'
@@ -20,18 +20,19 @@ interface NativeAdUnitProps {
 
 export function NativeAdUnit({ className, style, background = 'transparent' }: NativeAdUnitProps) {
   const mountRef = useRef<HTMLDivElement>(null)
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'unavailable'>('loading')
+  const [scriptState, setScriptState] = useState<'loading' | 'loaded' | 'error' | 'duplicate'>('loading')
 
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
 
-    // Prevent simultaneous instances of the one approved ad code.
+    // Do not execute the provider's fixed-ID tag more than once concurrently.
     if (activeNativeBanner) {
-      setStatus('unavailable')
+      setScriptState('duplicate')
       return
     }
 
+    let disposed = false
     const container = document.createElement('div')
     container.id = AD_CONTAINER_ID
     container.style.width = '100%'
@@ -43,11 +44,18 @@ export function NativeAdUnit({ className, style, background = 'transparent' }: N
     script.async = true
     script.setAttribute('data-cfasync', 'false')
     script.src = AD_SCRIPT_SRC
-    script.onload = () => setStatus('loaded')
-    script.onerror = () => setStatus('unavailable')
+    script.onload = () => {
+      if (!disposed) setScriptState('loaded')
+    }
+    script.onerror = () => {
+      if (!disposed) setScriptState('error')
+    }
     mount.appendChild(script)
 
     return () => {
+      disposed = true
+      script.onload = null
+      script.onerror = null
       script.remove()
       container.remove()
       if (activeNativeBanner === container) activeNativeBanner = null
@@ -66,7 +74,7 @@ export function NativeAdUnit({ className, style, background = 'transparent' }: N
         background,
         ...style,
       }}
-      data-adsterra-status={status}
+      data-adsterra-script-state={scriptState}
       aria-label="Sponsored advertisement"
     />
   )
