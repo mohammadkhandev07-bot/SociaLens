@@ -13,7 +13,6 @@ import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageComp
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
-import { PostShareAdOverlay } from '@/components/ads/PostShareAdOverlay'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface CreatePostModalProps {
@@ -96,7 +95,6 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
   const [showRestrictionPopup, setShowRestrictionPopup] = useState(false)
   const [showVideoLimitPopup, setShowVideoLimitPopup] = useState(false)
   const [checkingVideo, setCheckingVideo] = useState(false)
-  const [showShareAd, setShowShareAd] = useState(false)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -309,15 +307,9 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
       queryClient.invalidateQueries({ queryKey: ['explore-posts'] })
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] })
 
-      // The post is already live at this point - this brief sponsored
-      // interstitial just fills the natural "posting..." pause before
-      // closing, the same beat Instagram-style apps use for a short
-      // unavoidable wait instead of a bare spinner.
-      setShowShareAd(true)
-      setTimeout(() => {
-        setShowShareAd(false)
-        onClose()
-      }, 2500)
+      // The post is live. Close the composer without forcing an ad view.
+      // Native Banner inventory stays in its approved in-feed placement.
+      onClose()
     } catch (err) {
       console.error(err)
       alert('Upload failed. Please try again.')
@@ -348,7 +340,6 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
           onClose={() => setShowVideoLimitPopup(false)}
         />
       )}
-      {showShareAd && <PostShareAdOverlay />}
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={onClose}>
       <div className="bg-card border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl"
