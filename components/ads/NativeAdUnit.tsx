@@ -110,12 +110,14 @@ export function NativeAdUnit({ className, style, background = 'transparent' }: N
         display: 'block',
         background,
         height: height ? `${height}px` : MIN_HEIGHT,
+        position: 'relative',
+        zIndex: 15,
         transition: 'height 200ms ease',
         ...style,
       }}
       scrolling="no"
       loading="lazy"
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-forms"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-forms allow-top-navigation-by-user-activation"
       title="Sponsored"
       onLoad={() => setLoaded(true)}
       aria-hidden={!loaded}
