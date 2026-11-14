@@ -240,7 +240,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   }
 
   return (
-    <div className="relative w-full h-full flex-shrink-0 bg-black snap-start snap-always overflow-hidden">
+    <div className="relative w-full h-full flex-shrink-0 bg-background snap-start snap-always overflow-hidden">
       {/* Video */}
       {/* `src` is attached/detached by the effect above, never inline here.
           `poster` stops Android WebView from painting its own stretched grey
@@ -252,7 +252,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         onTimeUpdate={handleTimeUpdate}
         onError={handleVideoError}
         onStalled={handleVideoError}
-        className="absolute inset-0 w-full h-full object-cover" />
+        className="absolute inset-0 w-full h-full object-contain bg-background" />
 
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -264,8 +264,8 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         </div>
       )}
 
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.7) 100%)' }} />
+      {/* Keep unused letterbox space in the active theme color. Video content
+          itself is never cropped; controls retain their own contrast surfaces. */}
 
       {/* Seek bar - YouTube-style, drag anywhere along it to jump to that point */}
       <div
