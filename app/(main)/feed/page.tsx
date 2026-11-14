@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
+import { ResponsiveAdsterraBanner } from '@/components/ads/AdsterraBannerUnit'
 import { StoriesBar } from '@/components/stories/StoriesBar'
 import { useFeedPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
@@ -78,6 +79,11 @@ export default function FeedPage() {
             })
         }
       </div>
+      {!isLoading && posts.length > 0 && (
+        <div className="px-3 py-5 border-t border-border/40" aria-label="Sponsored banner">
+          <ResponsiveAdsterraBanner />
+        </div>
+      )}
       <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
     </div>
   )
