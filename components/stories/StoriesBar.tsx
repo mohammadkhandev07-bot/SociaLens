@@ -7,14 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { useActiveStories } from '@/lib/hooks/useStories'
 import { useUser } from '@/lib/hooks/useUser'
+import { AdStorySlot } from '@/components/ads/AdStorySlot'
+import { AdStoryViewer } from '@/components/ads/AdStoryViewer'
+import { interleaveAds } from '@/lib/utils/adInsertion'
 
-// StoriesBar renders on the Feed page, which is the very first thing
-// most people see. CreateStoryModal alone transitively pulls in the
-// Photo/Video/Text story editors (music picker, font picker, filters -
-// well over 2,000 lines combined) and StoryViewer is another ~800 -
-// none of that should be part of Feed's initial bundle when most visits
-// never open either of them. Loaded on demand instead, the moment
-// someone actually taps "Your Story" or a story ring.
 const CreateStoryModal = dynamic(() => import('./CreateStoryModal').then(m => m.CreateStoryModal), { ssr: false })
 const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewer), { ssr: false })
 
@@ -24,19 +20,36 @@ export function StoriesBar() {
   const [showCreate, setShowCreate] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
+  const [showAdStory, setShowAdStory] = useState(false)
+  const [adFromChain, setAdFromChain] = useState(false)
 
   const myGroup = groups.find((g) => g.userId === user?.id)
   const otherGroups = useMemo(() => groups.filter((g) => g.userId !== user?.id), [groups, user?.id])
+  const otherItems = useMemo(() => {
+    const withAds = interleaveAds(otherGroups, 3, 5)
+    if (withAds.length === 0 || withAds[withAds.length - 1] !== 'ad') withAds.push('ad')
+    return withAds
+  }, [otherGroups])
 
-  // Stories remain organic user content. Ad inventory is kept in the
-  // approved feed placement until separate story-specific codes are issued.
+  const handleReachEndOfStories = () => {
+    setViewerIndex(null)
+    setAdFromChain(true)
+    setShowAdStory(true)
+  }
+
+  const handleAdGoBack = () => {
+    setShowAdStory(false)
+    setAdFromChain(false)
+    const lastGroup = groups[groups.length - 1]
+    setViewerIndex(groups.length - 1)
+    setViewerStoryIndex(lastGroup ? lastGroup.stories.length - 1 : 0)
+  }
 
   if (!profile) return null
 
   return (
     <div className="mx-4 mt-4 mb-2">
       <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
-        {/* Your Story bubble */}
         <button
           onClick={() => {
             if (myGroup) {
@@ -63,25 +76,29 @@ export function StoriesBar() {
           <span className="text-[11px] text-muted-foreground truncate w-full text-center">Your Story</span>
         </button>
 
-        {/* Friends' stories */}
-        {otherGroups.map((item) => (
-          <button
-            key={item.userId}
-            onClick={() => {
-              setViewerStoryIndex(0)
-              setViewerIndex(groups.indexOf(item))
-            }}
-            className="flex flex-col items-center gap-1 shrink-0 w-16"
-          >
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
-              <Avatar className="h-full w-full border-2 border-background">
-                <AvatarImage src={getAvatarUrl(item.profile?.avatar_url)} />
-                <AvatarFallback>{item.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
-              </Avatar>
-            </div>
-            <span className="text-[11px] text-muted-foreground truncate w-full text-center">{item.profile?.username}</span>
-          </button>
-        ))}
+        {otherItems.map((item, index) => {
+          if (item === 'ad') {
+            return <AdStorySlot key={`ad-story-${index}`} onClick={() => { setAdFromChain(false); setShowAdStory(true) }} />
+          }
+          return (
+            <button
+              key={item.userId}
+              onClick={() => {
+                setViewerStoryIndex(0)
+                setViewerIndex(groups.indexOf(item))
+              }}
+              className="flex flex-col items-center gap-1 shrink-0 w-16"
+            >
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
+                <Avatar className="h-full w-full border-2 border-background">
+                  <AvatarImage src={getAvatarUrl(item.profile?.avatar_url)} />
+                  <AvatarFallback>{item.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </div>
+              <span className="text-[11px] text-muted-foreground truncate w-full text-center">{item.profile?.username}</span>
+            </button>
+          )
+        })}
       </div>
 
       {showCreate && user && <CreateStoryModal userId={user.id} onClose={() => setShowCreate(false)} />}
@@ -93,9 +110,16 @@ export function StoriesBar() {
           startStoryIndex={viewerStoryIndex}
           currentUserId={user?.id}
           onClose={() => setViewerIndex(null)}
+          onReachEnd={handleReachEndOfStories}
         />
       )}
 
+      {showAdStory && (
+        <AdStoryViewer
+          onClose={() => { setShowAdStory(false); setAdFromChain(false) }}
+          onGoBack={adFromChain ? handleAdGoBack : undefined}
+        />
+      )}
     </div>
   )
 }
