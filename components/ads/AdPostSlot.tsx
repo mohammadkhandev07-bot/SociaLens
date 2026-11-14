@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from 'react'
 import { Heart, MessageCircle, Bookmark, Send } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { NativeAdUnit } from './NativeAdUnit'
+import { AdsterraBannerUnit, type AdsterraBannerSize } from './AdsterraBannerUnit'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl, formatCount } from '@/lib/utils/helpers'
 import { getAdState, toggleAdLike, toggleAdSave, addAdComment, type LocalAdComment } from '@/lib/utils/adInteractions'
@@ -21,7 +22,7 @@ import { getAdState, toggleAdLike, toggleAdSave, addAdComment, type LocalAdComme
 // Instagram labels a sponsored post while keeping it just as tappable
 // As any other. Share is left out on purpose: there's nothing real
 // behind the ad to forward to someone else.
-export function AdPostSlot() {
+export function AdPostSlot({ bannerSize }: { bannerSize?: AdsterraBannerSize } = {}) {
   const generatedId = useId()
   const adId = `ad-post-${generatedId}`
   const { profile } = useUser()
@@ -77,7 +78,7 @@ export function AdPostSlot() {
       </div>
 
       <div className="relative w-full bg-muted">
-        <NativeAdUnit background="var(--card, #fff)" />
+        {bannerSize ? <AdsterraBannerUnit size={bannerSize} /> : <NativeAdUnit background="var(--card, #fff)" />}
       </div>
 
       <div className="flex items-center justify-between px-3 py-2">
