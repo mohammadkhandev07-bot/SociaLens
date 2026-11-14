@@ -116,7 +116,7 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <NativeAdUnit background="#000000" />
+        <NativeAdUnit background="#000000" priority />
       </div>
 
       {/* Tap zones for prev/next, kept short of the bottom action bar -
