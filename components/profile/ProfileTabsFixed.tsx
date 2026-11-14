@@ -29,6 +29,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
   const queryClient = useQueryClient()
   const canView = !isPrivate || isFollowing || isOwn
   const [selectedPost, setSelectedPost] = useState<PostWithProfile | null>(null)
+  const [notInterestedPostIds, setNotInterestedPostIds] = useState<Set<string>>(() => new Set())
 
   const query = useInfiniteQuery({
     queryKey: ['profile-posts-fixed', profileId],
@@ -82,7 +83,7 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
     staleTime: 30000,
   })
 
-  const posts = query.data?.pages.flatMap(page => page.posts) ?? []
+  const posts = (query.data?.pages.flatMap(page => page.posts) ?? []).filter(post => !notInterestedPostIds.has(post.id))
   const imagePosts = useMemo(() => posts.filter(p => p.media_type === 'image' || !p.media_url), [posts])
   const videoPosts = useMemo(() => posts.filter(p => p.media_type === 'video'), [posts])
 
@@ -172,7 +173,14 @@ export function ProfileTabsFixed({ profileId, isPrivate, isFollowing, isOwn }: P
       {selectedPost && (
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-3" onClick={() => setSelectedPost(null)}>
           <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl" onClick={e => e.stopPropagation()}>
-            <PostCard post={selectedPost} onDelete={deletePost} />
+            <PostCard
+              post={selectedPost}
+              onDelete={deletePost}
+              onNotInterested={(postId) => {
+                setNotInterestedPostIds(previous => new Set([...previous, postId]))
+                setSelectedPost(null)
+              }}
+            />
           </div>
         </div>
       )}
