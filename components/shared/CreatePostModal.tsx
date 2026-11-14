@@ -14,6 +14,7 @@ import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 import { useQueryClient } from '@tanstack/react-query'
+import { PostShareAdOverlay } from '@/components/ads/PostShareAdOverlay'
 
 interface CreatePostModalProps {
   onClose: () => void
@@ -340,6 +341,7 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
           onClose={() => setShowVideoLimitPopup(false)}
         />
       )}
+      {posting && <PostShareAdOverlay progress={uploadProgress} />}
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={onClose}>
       <div className="bg-card border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl"
