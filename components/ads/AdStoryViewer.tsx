@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { X, Heart, MessageCircle, Send } from 'lucide-react'
+import { X, Heart, MessageCircle, Send, ArrowLeft } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { NativeAdUnit } from './NativeAdUnit'
 import { useUser } from '@/lib/hooks/useUser'
@@ -105,6 +105,15 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
 
       <div className="absolute top-6 left-3 right-3 z-20 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
+          {onGoBack && (
+            <button
+              onClick={onGoBack}
+              className="text-white p-1 -ml-1"
+              aria-label="Back to previous story"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center">
             <span className="text-white text-xs font-bold">Ad</span>
           </div>
@@ -119,16 +128,9 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
         <NativeAdUnit background="#000000" priority />
       </div>
 
-      {/* Tap zones for prev/next, kept short of the bottom action bar -
-          same layout as the real StoryViewer's. Left third goes back to
-          the previous story when there is one; right two-thirds advances
-          (there's nothing after the ad, so that just closes). */}
-      <button
-        onClick={() => (onGoBack ? onGoBack() : onClose())}
-        className="absolute left-0 top-0 h-[calc(100%-84px)] w-1/3 z-10"
-        aria-label="Previous story"
-      />
-      <button onClick={onClose} className="absolute right-0 top-0 h-[calc(100%-84px)] w-2/3 z-10" aria-label="Next story" />
+      {/* No full-screen navigation tap zones here: they used to sit above
+          the third-party ad iframe and swallowed its click-through taps.
+          The ad remains clickable; use the explicit close/back controls. */}
 
       {/* Bottom action bar - like/react/comment, mirroring the real
           StoryViewer's non-owner action row. */}
