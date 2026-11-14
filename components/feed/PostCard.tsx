@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Trash2, Repeat2, Flag } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Trash2, Repeat2, Flag, EyeOff } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -27,9 +27,10 @@ import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
 interface PostCardProps {
   post: PostWithProfile
   onDelete?: (postId: string) => void
+  onNotInterested?: (postId: string) => void
 }
 
-export function PostCard({ post, onDelete }: PostCardProps) {
+export function PostCard({ post, onDelete, onNotInterested }: PostCardProps) {
   const { user, profile } = useUser()
   const [liked, setLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(post.likes_count)
@@ -214,15 +215,20 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="z-[120]">
               {isOwner ? (
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)}>
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Post
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={() => setShowReport(true)}>
-                  <Flag className="h-4 w-4 mr-2" /> Report
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={() => onNotInterested?.(post.id)}>
+                    <EyeOff className="h-4 w-4 mr-2" /> Not Interested
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowReport(true)}>
+                    <Flag className="h-4 w-4 mr-2" /> Report
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
