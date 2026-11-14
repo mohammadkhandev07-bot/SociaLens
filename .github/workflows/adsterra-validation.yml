@@ -3,6 +3,7 @@ name: Adsterra integration validation
 on:
   push:
     branches:
+      - main
       - fix/adsterra-native-banner-compliance
     paths:
       - "components/ads/**"
