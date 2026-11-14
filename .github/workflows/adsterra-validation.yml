@@ -1,6 +1,20 @@
 name: Adsterra integration validation
 
 on:
+  push:
+    branches:
+      - fix/adsterra-native-banner-compliance
+    paths:
+      - "components/ads/**"
+      - "components/feed/**"
+      - "components/reels/**"
+      - "components/stories/**"
+      - "components/shared/CreatePostModal.tsx"
+      - "app/(main)/feed/**"
+      - "app/(main)/explore/**"
+      - "lib/utils/adInsertion.ts"
+      - "package.json"
+      - "tsconfig.json"
   pull_request:
     paths:
       - "components/ads/**"
