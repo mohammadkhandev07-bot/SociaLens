@@ -11,32 +11,56 @@ const BANNER_CONFIG: Record<AdsterraBannerSize, { key: string; width: number; he
   '728x90': { key: '54d64196ac81fac2a3ec240eb95b1ae2', width: 728, height: 90 },
 }
 
-// Adsterra's display-banner snippet reads the global atOptions variable.
-// Keep one display-banner script active per document to prevent competing
-// snippets from overwriting that shared configuration.
 let activeBannerKey: string | null = null
+let activeBannerOwner: symbol | null = null
+let activeBannerPriority = false
+let activeBannerRelease: (() => void) | null = null
+const BANNER_PRIORITY_EVENT = 'socialens:display-ad-priority'
 
 interface AdsterraBannerUnitProps {
   size: AdsterraBannerSize
   className?: string
+  priority?: boolean
 }
 
-export function AdsterraBannerUnit({ size, className = '' }: AdsterraBannerUnitProps) {
+export function AdsterraBannerUnit({ size, className = '', priority = false }: AdsterraBannerUnitProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error' | 'duplicate'>('loading')
+  const [paused, setPaused] = useState(false)
   const config = BANNER_CONFIG[size]
+
+  useEffect(() => {
+    const handlePriority = (event: Event) => {
+      if (priority) return
+      setPaused((event as CustomEvent<boolean>).detail)
+    }
+    window.addEventListener(BANNER_PRIORITY_EVENT, handlePriority)
+    if (!priority && activeBannerPriority) setPaused(true)
+    return () => window.removeEventListener(BANNER_PRIORITY_EVENT, handlePriority)
+  }, [priority])
 
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
+    if (paused || (!priority && activeBannerPriority)) return
+
+    if (priority) {
+      activeBannerPriority = true
+      window.dispatchEvent(new CustomEvent(BANNER_PRIORITY_EVENT, { detail: true }))
+      activeBannerRelease?.()
+    }
 
     if (activeBannerKey) {
       setStatus('duplicate')
       return
     }
 
+    setStatus('loading')
     let disposed = false
+    const owner = Symbol('display-ad')
+    activeBannerOwner = owner
     activeBannerKey = config.key
+
     const wrapper = document.createElement('div')
     wrapper.style.width = `${config.width}px`
     wrapper.style.height = `${config.height}px`
@@ -64,15 +88,27 @@ export function AdsterraBannerUnit({ size, className = '' }: AdsterraBannerUnitP
     }
     wrapper.appendChild(script)
 
-    return () => {
+    const release = () => {
+      if (activeBannerOwner !== owner) return
       disposed = true
       script.onload = null
       script.onerror = null
       script.remove()
       wrapper.remove()
-      if (activeBannerKey === config.key) activeBannerKey = null
+      activeBannerKey = null
+      activeBannerOwner = null
+      activeBannerRelease = null
     }
-  }, [config.key, config.width, config.height])
+    activeBannerRelease = release
+
+    return () => {
+      release()
+      if (priority) {
+        activeBannerPriority = false
+        window.dispatchEvent(new CustomEvent(BANNER_PRIORITY_EVENT, { detail: false }))
+      }
+    }
+  }, [config.key, config.width, config.height, paused, priority])
 
   return (
     <div
@@ -85,7 +121,6 @@ export function AdsterraBannerUnit({ size, className = '' }: AdsterraBannerUnitP
   )
 }
 
-/** Select exactly one publisher-approved banner size for the current viewport. */
 export function ResponsiveAdsterraBanner({ className = '' }: { className?: string }) {
   const [size, setSize] = useState<AdsterraBannerSize | null>(null)
 
