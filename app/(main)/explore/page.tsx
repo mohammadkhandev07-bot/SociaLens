@@ -215,7 +215,7 @@ export default function ExplorePage() {
           {(activeTab === 'all' || activeTab === 'posts') && searchPosts.length > 0 && (
             <div>
               <div className="px-4 pb-2"><h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"><Grid3x3 className="h-3.5 w-3.5" /> Posts</h3></div>
-              {searchItems.map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}
+              {searchItems.map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} bannerSize="300x250" /> : <PostCard key={item.id} post={item} />)}
             </div>
           )}
           {!searchProfiles.length && !searchPosts.length && !searchHashtags.length && (
@@ -239,7 +239,7 @@ export default function ExplorePage() {
             <div className="mx-4 mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
               <div className="flex items-start gap-2 text-destructive"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div>
             </div>
-          ) : posts.length > 0 ? exploreItems.map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />) : (
+          ) : posts.length > 0 ? exploreItems.map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} bannerSize="300x250" /> : <PostCard key={item.id} post={item} />) : (
             <div className="text-center py-12 text-muted-foreground"><Grid3x3 className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No posts to show right now</p></div>
           )}
           <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore} isLoading={isFetchingMoreExplore} />
