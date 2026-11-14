@@ -6,6 +6,7 @@ on:
       - main
       - fix/adsterra-native-banner-compliance
     paths:
+      - ".github/workflows/adsterra-validation.yml"
       - "components/ads/**"
       - "components/feed/**"
       - "components/reels/**"
@@ -18,6 +19,7 @@ on:
       - "tsconfig.json"
   pull_request:
     paths:
+      - ".github/workflows/adsterra-validation.yml"
       - "components/ads/**"
       - "components/feed/**"
       - "components/reels/**"
