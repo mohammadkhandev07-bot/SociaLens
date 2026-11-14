@@ -1,0 +1,52 @@
+name: Adsterra integration validation
+
+on:
+  push:
+    branches:
+      - fix/adsterra-native-banner-compliance
+    paths:
+      - "components/ads/**"
+      - "components/feed/**"
+      - "components/reels/**"
+      - "components/stories/**"
+      - "components/shared/CreatePostModal.tsx"
+      - "app/(main)/feed/**"
+      - "app/(main)/explore/**"
+      - "lib/utils/adInsertion.ts"
+      - "package.json"
+      - "tsconfig.json"
+  pull_request:
+    paths:
+      - "components/ads/**"
+      - "components/feed/**"
+      - "components/reels/**"
+      - "components/stories/**"
+      - "components/shared/CreatePostModal.tsx"
+      - "app/(main)/feed/**"
+      - "app/(main)/explore/**"
+      - "lib/utils/adInsertion.ts"
+      - "package.json"
+      - "tsconfig.json"
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: TypeScript validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run TypeScript checks
+        run: npx tsc --noEmit

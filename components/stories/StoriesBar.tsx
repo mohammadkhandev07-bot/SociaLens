@@ -7,9 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { useActiveStories } from '@/lib/hooks/useStories'
 import { useUser } from '@/lib/hooks/useUser'
-import { AdStorySlot } from '@/components/ads/AdStorySlot'
-import { AdStoryViewer } from '@/components/ads/AdStoryViewer'
-import { interleaveAds } from '@/lib/utils/adInsertion'
 
 // StoriesBar renders on the Feed page, which is the very first thing
 // most people see. CreateStoryModal alone transitively pulls in the
@@ -27,46 +24,12 @@ export function StoriesBar() {
   const [showCreate, setShowCreate] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
-  const [showAdStory, setShowAdStory] = useState(false)
-
-  // Whether the ad story we're showing was reached by finishing (or
-  // tapping past) the very last real story, rather than by tapping the
-  // sponsored ring directly - only then does a back-tap on it make sense
-  // (there's a real story to return to).
-  const [adFromChain, setAdFromChain] = useState(false)
 
   const myGroup = groups.find((g) => g.userId === user?.id)
   const otherGroups = useMemo(() => groups.filter((g) => g.userId !== user?.id), [groups, user?.id])
 
-  // Randomized gaps (3-5 real stories apart), and always one more right
-  // at the end of the row - the one fixed rule, everything else varies.
-  const otherItems = useMemo(() => {
-    const withRandomAds = interleaveAds(otherGroups, 3, 5)
-    if (withRandomAds.length === 0 || withRandomAds[withRandomAds.length - 1] !== 'ad') {
-      withRandomAds.push('ad')
-    }
-    return withRandomAds
-  }, [otherGroups])
-
-  // Finishing (or tapping past) the very last story of the very last
-  // group now chains into the trailing sponsored story instead of just
-  // closing the viewer - so people actually reach it in the normal
-  // scroll-through-stories flow, not only by tapping the ring directly.
-  const handleReachEndOfStories = () => {
-    setViewerIndex(null)
-    setAdFromChain(true)
-    setShowAdStory(true)
-  }
-
-  // Tapping back (left side) on a chained-in ad story returns to exactly
-  // where the person left off - the last story of the last group.
-  const handleAdGoBack = () => {
-    setShowAdStory(false)
-    setAdFromChain(false)
-    const lastGroup = groups[groups.length - 1]
-    setViewerIndex(groups.length - 1)
-    setViewerStoryIndex(lastGroup ? lastGroup.stories.length - 1 : 0)
-  }
+  // Stories remain organic user content. Ad inventory is kept in the
+  // approved feed placement until separate story-specific codes are issued.
 
   if (!profile) return null
 
@@ -100,30 +63,25 @@ export function StoriesBar() {
           <span className="text-[11px] text-muted-foreground truncate w-full text-center">Your Story</span>
         </button>
 
-        {/* Friends' stories, with sponsored rings mixed in at random gaps */}
-        {otherItems.map((item, index) => {
-          if (item === 'ad') {
-            return <AdStorySlot key={`ad-${index}`} onClick={() => setShowAdStory(true)} />
-          }
-          return (
-            <button
-              key={item.userId}
-              onClick={() => {
-                setViewerStoryIndex(0)
-                setViewerIndex(groups.indexOf(item))
-              }}
-              className="flex flex-col items-center gap-1 shrink-0 w-16"
-            >
-              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
-                <Avatar className="h-full w-full border-2 border-background">
-                  <AvatarImage src={getAvatarUrl(item.profile?.avatar_url)} />
-                  <AvatarFallback>{item.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-              </div>
-              <span className="text-[11px] text-muted-foreground truncate w-full text-center">{item.profile?.username}</span>
-            </button>
-          )
-        })}
+        {/* Friends' stories */}
+        {otherGroups.map((item) => (
+          <button
+            key={item.userId}
+            onClick={() => {
+              setViewerStoryIndex(0)
+              setViewerIndex(groups.indexOf(item))
+            }}
+            className="flex flex-col items-center gap-1 shrink-0 w-16"
+          >
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
+              <Avatar className="h-full w-full border-2 border-background">
+                <AvatarImage src={getAvatarUrl(item.profile?.avatar_url)} />
+                <AvatarFallback>{item.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+            </div>
+            <span className="text-[11px] text-muted-foreground truncate w-full text-center">{item.profile?.username}</span>
+          </button>
+        ))}
       </div>
 
       {showCreate && user && <CreateStoryModal userId={user.id} onClose={() => setShowCreate(false)} />}
@@ -135,16 +93,9 @@ export function StoriesBar() {
           startStoryIndex={viewerStoryIndex}
           currentUserId={user?.id}
           onClose={() => setViewerIndex(null)}
-          onReachEnd={handleReachEndOfStories}
         />
       )}
 
-      {showAdStory && (
-        <AdStoryViewer
-          onClose={() => { setShowAdStory(false); setAdFromChain(false) }}
-          onGoBack={adFromChain ? handleAdGoBack : undefined}
-        />
-      )}
     </div>
   )
 }

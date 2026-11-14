@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ReelCard } from './ReelCard'
-import { AdReelSlot } from '@/components/ads/AdReelSlot'
-import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
@@ -37,13 +35,6 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
     setActiveIndex(newIndex)
   }, [])
 
-  // Must run on every render, before any early return below - a hook
-  // called only sometimes (e.g. skipped while isLoading) changes how many
-  // hooks React sees between renders, which is exactly what was crashing
-  // this page (React error #310, "rendered more hooks than previous
-  // render").
-  const items = useMemo(() => interleaveAds(dedupeById(reels), 3, 8), [reels])
-
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-black">
@@ -69,33 +60,17 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
       className="h-full overflow-y-scroll snap-y snap-mandatory"
       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
     >
-      {items.map((item, index) => {
-        if (item === 'ad') {
-          return (
-            <AdReelSlot
-              key={`ad-${index}`}
-              isActive={index === activeIndex}
-              isMuted={isMuted}
-              onToggleMute={() => setIsMuted(m => !m)}
-            />
-          )
-        }
-        return (
-          <ReelCard
-            key={(item as PostWithProfile).id}
-            post={item as PostWithProfile}
-            isActive={index === activeIndex}
-            // Active reel +/- 1 only. Everything else keeps its place in the
-            // scroller but holds no video source, so Android WebView is
-            // never asked for more decoders than it is willing to give -
-            // which is what left every reel stuck on a placeholder in the
-            // APK. Infinite scroll and swipe navigation are untouched.
-            shouldLoad={Math.abs(index - activeIndex) <= 1}
-            isMuted={isMuted}
-            onToggleMute={() => setIsMuted(m => !m)}
-          />
-        )
-      })}
+      {reels.map((post, index) => (
+        <ReelCard
+          key={post.id}
+          post={post}
+          isActive={index === activeIndex}
+          // Keep media decoding limited to the active reel and its neighbors.
+          shouldLoad={Math.abs(index - activeIndex) <= 1}
+          isMuted={isMuted}
+          onToggleMute={() => setIsMuted(m => !m)}
+        />
+      ))}
     </div>
   )
 }

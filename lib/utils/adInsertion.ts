@@ -47,3 +47,13 @@ export function dedupeById<T extends { id: string }>(items: T[]): T[] {
   }
   return result
 }
+
+
+/**
+ * Inserts no more than one sponsored marker into a feed batch. Additional
+ * Native Banner placements require separate approved Adsterra codes.
+ */
+export function interleaveSingleAd<T>(items: T[], afterItems = 5): (T | 'ad')[] {
+  if (items.length <= afterItems) return items
+  return [...items.slice(0, afterItems), 'ad', ...items.slice(afterItems)]
+}
