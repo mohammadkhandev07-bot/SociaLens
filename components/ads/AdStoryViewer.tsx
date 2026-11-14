@@ -62,7 +62,18 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
       return
     }
     startRef.current = Date.now()
+    // If an advertiser opens in a new tab, pause the story clock while this
+    // page is in the background so the sponsored story is still there on return.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        elapsedRef.current += Date.now() - startRef.current
+      } else {
+        startRef.current = Date.now()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return
       const pct = Math.min(100, ((elapsedRef.current + Date.now() - startRef.current) / DURATION_MS) * 100)
       setProgress(pct)
       if (pct >= 100) {
@@ -70,7 +81,10 @@ export function AdStoryViewer({ onClose, onGoBack }: AdStoryViewerProps) {
         onClose()
       }
     }, 50)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused])
 
